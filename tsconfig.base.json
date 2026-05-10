@@ -25,7 +25,7 @@
         "packages/devtools/src/index.ts"
       ],
       "@flowforge/react": [
-        "packages/react/src/index.ts"
+        "packages/react/src/index.tsx"
       ],
       "@flowforge/server": [
         "packages/server/src/index.ts"

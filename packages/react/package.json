@@ -20,7 +20,8 @@
     "clean": "tsc -b --clean"
   },
   "dependencies": {
-    "@flowforge/core": "0.1.0"
+    "@flowforge/core": "0.1.0",
+    "@flowforge/server": "0.1.0"
   },
   "peerDependencies": {
     "react": ">=18"

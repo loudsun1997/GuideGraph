@@ -1,0 +1,25 @@
+{
+  "name": "@flowforge/permit-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b && vite build",
+    "dev": "vite --host 127.0.0.1",
+    "preview": "vite preview --host 127.0.0.1"
+  },
+  "dependencies": {
+    "@flowforge/core": "0.1.0",
+    "@flowforge/react": "0.1.0",
+    "@flowforge/server": "0.1.0",
+    "@flowforge/storage-memory": "0.1.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^5.7.3",
+    "vite": "^8.0.11"
+  }
+}

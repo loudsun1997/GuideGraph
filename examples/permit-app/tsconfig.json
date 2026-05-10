@@ -1,0 +1,29 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "tsBuildInfoFile": "../../node_modules/.cache/tsbuildinfo/permit-app.tsbuildinfo",
+    "types": [
+      "vite/client"
+    ]
+  },
+  "references": [
+    {
+      "path": "../../packages/core"
+    },
+    {
+      "path": "../../packages/server"
+    },
+    {
+      "path": "../../packages/storage-memory"
+    },
+    {
+      "path": "../../packages/react"
+    }
+  ],
+  "include": [
+    "src"
+  ]
+}

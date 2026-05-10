@@ -20,6 +20,8 @@ npm install
 npm run build
 ```
 
+For a detailed list of supported features, unsupported features, package responsibilities, and usage examples, read [FlowForge Capabilities Guide](docs/CAPABILITIES.md).
+
 ## Packages
 
 - `@flowforge/core`: workflow definitions, execution primitives, and storage contracts.
@@ -29,29 +31,45 @@ npm run build
 - `@flowforge/storage-postgres`: Postgres-backed workflow storage adapter.
 - `@flowforge/devtools`: event collection helpers for workflow debugging tools.
 
-## Example
+## Example App
+
+Run the permit workflow example:
+
+```sh
+npm run dev:permit
+```
+
+Then open:
+
+```text
+http://127.0.0.1:5173/
+```
+
+The example demonstrates concurrent steps, merge blocking, branch decisions, retry loops, history, revisions, server runtime usage, memory storage, and React bindings.
+
+## Core Example
 
 ```ts
-import { createWorkflow, runWorkflow } from "@flowforge/core";
+import { createWorkflowInstance, applyWorkflowEvent } from "@flowforge/core";
 
-const workflow = createWorkflow({
-  id: "publish-post",
-  name: "Publish post",
-  steps: [
-    {
-      id: "draft",
-      run: async () => ({ title: "Hello FlowForge" })
-    },
-    {
-      id: "publish",
-      run: async (context) => ({
-        ...context.results.draft,
-        published: true
-      })
-    }
-  ]
+const instance = createWorkflowInstance({
+  definition: permitWorkflow,
+  instanceId: "permit_1",
+  actorId: "user_1"
 });
 
-const result = await runWorkflow(workflow);
-console.log(result.status);
+const result = applyWorkflowEvent({
+  definition: permitWorkflow,
+  instance,
+  event: {
+    id: "event_1",
+    instanceId: "permit_1",
+    type: "COMPLETE_STEP",
+    stepId: "fillForm",
+    actorId: "user_1",
+    occurredAt: new Date().toISOString()
+  }
+});
+
+console.log(result.instance.revision);
 ```

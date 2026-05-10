@@ -18,6 +18,9 @@
     },
     {
       "path": "./packages/devtools"
+    },
+    {
+      "path": "./examples/permit-app"
     }
   ]
 }

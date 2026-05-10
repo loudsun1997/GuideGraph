@@ -20,6 +20,8 @@ export class MemoryWorkflowStorage implements WorkflowStorage {
     try {
       this.#instances.set(input.instance.id, cloneInstance(input.instance));
       this.#history.set(input.instance.id, input.historyEntries.map(cloneHistoryEntry));
+      this.#events.set(input.instance.id, []);
+      this.#deleteIdempotencyRecordsForInstance(input.instance.id);
     } catch (error) {
       this.#restore(snapshot);
       throw error;
@@ -105,6 +107,16 @@ export class MemoryWorkflowStorage implements WorkflowStorage {
 
     for (const [key, record] of snapshot.idempotencyRecords) {
       this.#idempotencyRecords.set(key, record);
+    }
+  }
+
+  #deleteIdempotencyRecordsForInstance(instanceId: string): void {
+    const prefix = `${instanceId}:`;
+
+    for (const key of this.#idempotencyRecords.keys()) {
+      if (key.startsWith(prefix)) {
+        this.#idempotencyRecords.delete(key);
+      }
     }
   }
 }

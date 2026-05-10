@@ -5,10 +5,13 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "examples/*"
   ],
   "scripts": {
     "build": "tsc -b",
+    "build:examples": "npm run build --workspace @flowforge/permit-app",
+    "dev:permit": "npm run dev --workspace @flowforge/permit-app",
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run",
     "test:core": "vitest run packages/core/tests",
@@ -18,11 +21,17 @@
   "devDependencies": {
     "@types/node": "^22.13.1",
     "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.2.3",
     "typescript": "^5.7.3",
+    "vite": "^8.0.11",
     "vitest": "^4.1.5"
   },
   "engines": {
     "node": ">=20"
   },
-  "packageManager": "npm@10.9.2"
+  "packageManager": "npm@10.9.2",
+  "dependencies": {
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6"
+  }
 }
