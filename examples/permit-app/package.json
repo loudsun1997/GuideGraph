@@ -9,10 +9,10 @@
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
-    "@flowforge/core": "0.1.0",
-    "@flowforge/react": "0.1.0",
-    "@flowforge/server": "0.1.0",
-    "@flowforge/storage-memory": "0.1.0",
+    "@flowforge/core": "workspace:*",
+    "@flowforge/react": "workspace:*",
+    "@flowforge/server": "workspace:*",
+    "@flowforge/storage-memory": "workspace:*",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
   },

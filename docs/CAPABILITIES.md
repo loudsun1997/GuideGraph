@@ -123,6 +123,9 @@ The permit app demonstrates:
 - React rendering through `@flowforge/react`
 - server/runtime calls through `@flowforge/server`
 - memory persistence through `@flowforge/storage-memory`
+- explicit reset behavior through `resetInstance()`
+
+Manual validation steps are documented in [examples/permit-app/MANUAL_TEST.md](../examples/permit-app/MANUAL_TEST.md).
 
 ## Workflow Definitions
 
@@ -732,11 +735,20 @@ Use workflow state:
 import { useWorkflow } from "@flowforge/react";
 
 function DebugPanel() {
-  const { instance } = useWorkflow();
+  const { instance, resetInstance } = useWorkflow();
 
-  return <p>Revision: {instance?.revision ?? "none"}</p>;
+  return (
+    <>
+      <p>Revision: {instance?.revision ?? "none"}</p>
+      <button onClick={() => void resetInstance()} type="button">
+        Reset Instance
+      </button>
+    </>
+  );
 }
 ```
+
+`resetInstance()` intentionally creates a fresh instance for the provider's current `instanceId`. In the memory-storage demo, this replaces the old in-memory instance, clears event/idempotency records for that id, and starts again at revision `0`.
 
 Use available actions:
 
@@ -797,12 +809,14 @@ Available components:
 
 These are intentionally simple. They are meant to prove the API is usable from a frontend, not to be a final design system.
 
+The React package depends on a `WorkflowClient` interface. It does not depend on the server implementation. The permit app uses a local client adapter that wraps `createWorkflowServer()` for demo purposes.
+
 ## Example App
 
 Run the permit app:
 
 ```sh
-npm run dev:permit
+pnpm dev:permit
 ```
 
 Open:
@@ -826,6 +840,8 @@ The app demonstrates:
 11. Complete `fixIssues`.
 12. Return to `submitApplication`.
 13. Resubmit and approve.
+
+The demo uses in-memory storage. Refreshing the page clears the workflow state.
 
 ## Supported Today
 
@@ -994,19 +1010,19 @@ Current tests cover:
 Run all tests:
 
 ```sh
-npm test
+pnpm test
 ```
 
 Run core tests:
 
 ```sh
-npm run test:core
+pnpm test:core
 ```
 
 Run server/storage tests:
 
 ```sh
-npm run test:server
+pnpm test:server
 ```
 
 ## Build and Verification
@@ -1014,21 +1030,21 @@ npm run test:server
 Useful commands:
 
 ```sh
-npm install
-npm test
-npm run typecheck
-npm run build
-npm run build:examples
-npm run dev:permit
+pnpm install
+pnpm test
+pnpm typecheck
+pnpm build
+pnpm build:examples
+pnpm dev:permit
 ```
 
 The expected healthy state is:
 
 ```text
-npm test passes
-npm run typecheck passes
-npm run build passes
-npm run build:examples passes
+pnpm test passes
+pnpm typecheck passes
+pnpm build passes
+pnpm build:examples passes
 permit app runs locally
 approval path works
 rejection/retry path works

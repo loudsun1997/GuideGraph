@@ -14,12 +14,34 @@ import type {
   WorkflowInstance,
   WorkflowStepState
 } from "@flowforge/core";
-import type {
-  CreateWorkflowInstanceInput,
-  CreateWorkflowInstanceResult,
-  SendWorkflowEventInput,
-  SendWorkflowEventResult
-} from "@flowforge/server";
+
+export interface CreateWorkflowInstanceInput {
+  readonly definition: WorkflowDefinition;
+  readonly instanceId: string;
+  readonly actorId?: string;
+  readonly now?: string;
+}
+
+export interface CreateWorkflowInstanceResult {
+  readonly instance: WorkflowInstance;
+  readonly availableActions: readonly AvailableWorkflowAction[];
+}
+
+export interface SendWorkflowEventInput {
+  readonly definition: WorkflowDefinition;
+  readonly instanceId: string;
+  readonly event: WorkflowEvent;
+  readonly expectedRevision?: number;
+  readonly idempotencyKey?: string;
+}
+
+export interface SendWorkflowEventResult {
+  readonly instance: WorkflowInstance;
+  readonly historyEntry: WorkflowHistoryEntry;
+  readonly changedStepIds: readonly string[];
+  readonly availableActions: readonly AvailableWorkflowAction[];
+  readonly warnings: readonly string[];
+}
 
 export interface WorkflowClient {
   createInstance(input: CreateWorkflowInstanceInput): Promise<CreateWorkflowInstanceResult>;
@@ -243,6 +265,9 @@ export function CurrentStepCard(): ReactNode {
     <section className="ff-panel">
       <h2>Active Steps</h2>
       <div className="ff-card-list">
+        {activeSteps.length === 0 ? (
+          <p className="ff-empty-message">No active steps. This workflow has reached a terminal state.</p>
+        ) : null}
         {activeSteps.map((step) => {
           const actions = availableActions.filter((action) => action.stepId === step.id);
 
@@ -284,6 +309,9 @@ export function NextActions(): ReactNode {
     <section className="ff-panel">
       <h2>Available Actions</h2>
       <div className="ff-action-list">
+        {availableActions.length === 0 ? (
+          <p className="ff-empty-message">No actions are currently available.</p>
+        ) : null}
         {availableActions.map((action) => (
           <button
             disabled={isLoading}
@@ -319,6 +347,9 @@ export function BlockedSteps(): ReactNode {
     <section className="ff-panel">
       <h2>Blocked Steps</h2>
       <div className="ff-card-list">
+        {blockedSteps.length === 0 ? (
+          <p className="ff-empty-message">No blocked steps.</p>
+        ) : null}
         {blockedSteps.map((step) => (
           <article className="ff-blocked-step" key={step.id}>
             <strong>{step.name}</strong>

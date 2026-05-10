@@ -82,6 +82,14 @@ button:disabled {
   padding: 8px 10px;
 }
 
+.debug-panel strong {
+  border: 1px solid #5e7f42;
+  border-radius: 6px;
+  background: #f2f7ec;
+  color: #395127;
+  padding: 8px 10px;
+}
+
 .capability-map {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -168,6 +176,11 @@ button:disabled {
 .ff-status-list {
   display: grid;
   gap: 10px;
+}
+
+.ff-empty-message {
+  margin: 0;
+  color: #667382;
 }
 
 .ff-step-card,

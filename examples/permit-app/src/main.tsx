@@ -11,13 +11,12 @@ import {
   useWorkflow
 } from "@flowforge/react";
 import type { WorkflowStepStatus } from "@flowforge/core";
-import { createWorkflowServer } from "@flowforge/server";
-import { MemoryWorkflowStorage } from "@flowforge/storage-memory";
 import { permitWorkflow } from "./permitWorkflow.js";
+import { createLocalWorkflowClient } from "./workflowClient.js";
 import "./styles.css";
 
 function App() {
-  const client = useMemo(() => createWorkflowServer({ storage: new MemoryWorkflowStorage() }), []);
+  const client = useMemo(() => createLocalWorkflowClient(), []);
 
   return (
     <WorkflowProvider
@@ -191,10 +190,11 @@ function DebugPanel() {
   }
 
   return (
-    <section className="debug-panel">
+    <section className="debug-panel" data-status={instance.status}>
       <span>Status: {instance.status}</span>
       <span>Revision: {instance.revision}</span>
       <span>Active: {instance.activeStepIds.join(", ") || "none"}</span>
+      {instance.status === "completed" ? <strong>Workflow complete</strong> : null}
     </section>
   );
 }

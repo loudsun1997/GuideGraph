@@ -2,7 +2,7 @@
 
 FlowForge is a developer toolkit for building, running, storing, and inspecting workflows.
 
-This repository is organized as a small npm workspace:
+This repository is organized as a small pnpm workspace:
 
 ```text
 @flowforge/core
@@ -16,8 +16,8 @@ This repository is organized as a small npm workspace:
 ## Getting Started
 
 ```sh
-npm install
-npm run build
+pnpm install
+pnpm build
 ```
 
 For a detailed list of supported features, unsupported features, package responsibilities, and usage examples, read [FlowForge Capabilities Guide](docs/CAPABILITIES.md).
@@ -36,7 +36,7 @@ For a detailed list of supported features, unsupported features, package respons
 Run the permit workflow example:
 
 ```sh
-npm run dev:permit
+pnpm dev:permit
 ```
 
 Then open:
