@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@flowforge/core": "workspace:*",
+    "@flowforge/http": "workspace:*",
     "@flowforge/react": "workspace:*",
     "@flowforge/server": "workspace:*",
     "@flowforge/storage-memory": "workspace:*",

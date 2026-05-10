@@ -3,8 +3,11 @@ import { createWorkflowServer, type CommitWorkflowEventInput, type WorkflowStora
 import { newDb } from "pg-mem";
 import { describe, expect, it } from "vitest";
 import {
+  checkFlowForgePostgresSchema,
+  FlowForgePostgresSchemaError,
   POSTGRES_WORKFLOW_SCHEMA_SQL,
   PostgresWorkflowStorage,
+  runFlowForgePostgresMigrations,
   type PostgresConnection,
   type PostgresQueryResult,
   type PostgresQueryable,
@@ -158,6 +161,83 @@ describe("PostgresWorkflowStorage", () => {
       })
     ).rejects.toMatchObject({
       code: "IDEMPOTENCY_CONFLICT"
+    });
+  });
+
+  it("cascades idempotency records when an instance is deleted", async () => {
+    const { pool, server } = await createTestServer();
+    const createResult = await server.createInstance({
+      definition: permitWorkflow,
+      instanceId: "instance_1"
+    });
+
+    await server.sendEvent({
+      definition: permitWorkflow,
+      instanceId: "instance_1",
+      idempotencyKey: "abc",
+      event: workflowEvent(createResult.instance, "fillForm", {
+        id: "event_1"
+      })
+    });
+
+    const beforeDelete = await pool.query(
+      "select instance_id from workflow_idempotency_results where instance_id = $1",
+      ["instance_1"]
+    );
+
+    await pool.query("delete from workflow_instances where id = $1", ["instance_1"]);
+
+    const afterDelete = await pool.query(
+      "select instance_id from workflow_idempotency_results where instance_id = $1",
+      ["instance_1"]
+    );
+
+    expect(beforeDelete.rows).toHaveLength(1);
+    expect(afterDelete.rows).toHaveLength(0);
+  });
+
+  it("runs migrations and checks the installed schema", async () => {
+    const pool = createPostgresPool();
+
+    await runFlowForgePostgresMigrations({ connection: pool });
+
+    const result = await checkFlowForgePostgresSchema({ connection: pool });
+    const migrations = await pool.query<{ version: string }>(
+      "select version from workflow_schema_migrations order by version"
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      missingTables: []
+    });
+    expect(migrations.rows.map((row) => row.version)).toEqual(["0001_init"]);
+  });
+
+  it("throws a clear schema error when tables are missing", async () => {
+    const pool = createPostgresPool();
+    const storage = new PostgresWorkflowStorage(pool);
+
+    await expect(storage.checkSchema()).rejects.toThrow(FlowForgePostgresSchemaError);
+    await expect(storage.checkSchema()).rejects.toThrow("npx flowforge postgres init");
+  });
+
+  it("auto-migrates only when explicitly enabled", async () => {
+    const pool = createPostgresPool();
+    const storage = new PostgresWorkflowStorage({
+      connection: pool,
+      autoMigrate: true
+    });
+    const server = createWorkflowServer({ storage });
+
+    const result = await server.createInstance({
+      definition: permitWorkflow,
+      instanceId: "instance_1"
+    });
+
+    expect(result.instance.id).toBe("instance_1");
+    await expect(storage.checkSchema()).resolves.toEqual({
+      ok: true,
+      missingTables: []
     });
   });
 
@@ -320,9 +400,7 @@ async function createTestServer(): Promise<{
   server: ReturnType<typeof createWorkflowServer>;
   storage: WorkflowStorage;
 }> {
-  const db = newDb({ autoCreateForeignKeyIndices: true });
-  const { Pool } = db.adapters.createPg();
-  const pool = new Pool() as PostgresConnection;
+  const pool = createPostgresPool();
 
   await pool.query(POSTGRES_WORKFLOW_SCHEMA_SQL);
 
@@ -330,6 +408,12 @@ async function createTestServer(): Promise<{
   const server = createWorkflowServer({ storage });
 
   return { pool, server, storage };
+}
+
+function createPostgresPool(): PostgresConnection {
+  const db = newDb({ autoCreateForeignKeyIndices: true });
+  const { Pool } = db.adapters.createPg();
+  return new Pool() as PostgresConnection;
 }
 
 class RecordingFailingConnection implements PostgresConnection {

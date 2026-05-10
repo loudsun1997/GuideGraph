@@ -12,11 +12,15 @@ import {
 } from "@flowforge/react";
 import type { WorkflowStepStatus } from "@flowforge/core";
 import { permitWorkflow } from "./permitWorkflow.js";
-import { createLocalWorkflowClient } from "./workflowClient.js";
+import { createHttpDemoWorkflowClient, createLocalWorkflowClient } from "./workflowClient.js";
 import "./styles.css";
 
 function App() {
-  const client = useMemo(() => createLocalWorkflowClient(), []);
+  const transport = getTransportMode();
+  const client = useMemo(
+    () => (transport === "http" ? createHttpDemoWorkflowClient() : createLocalWorkflowClient()),
+    [transport]
+  );
 
   return (
     <WorkflowProvider
@@ -40,7 +44,7 @@ function PermitWorkflow() {
           <p>FlowForge example</p>
           <h1>Permit Application</h1>
           <p className="storage-note">
-            Demo storage is in-memory. Refreshing the page clears this workflow.
+            {getStorageNote()}
           </p>
         </div>
         <button
@@ -80,6 +84,18 @@ function PermitWorkflow() {
       )}
     </main>
   );
+}
+
+function getTransportMode(): "local" | "http" {
+  return new URLSearchParams(window.location.search).get("transport") === "http" ? "http" : "local";
+}
+
+function getStorageNote(): string {
+  if (getTransportMode() === "http") {
+    return "HTTP demo mode: React calls createHttpWorkflowClient, which talks to a local FlowForge HTTP handler backed by memory storage.";
+  }
+
+  return "Local demo mode: React calls the FlowForge server object directly with memory storage. Add ?transport=http to test the HTTP client path.";
 }
 
 function CapabilityMap() {

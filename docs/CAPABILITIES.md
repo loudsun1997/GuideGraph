@@ -20,6 +20,7 @@ The most important rule is that applications should not mutate workflow state di
 ```text
 @flowforge/core
 @flowforge/server
+@flowforge/http
 @flowforge/storage-memory
 @flowforge/react
 @flowforge/storage-postgres
@@ -62,6 +63,20 @@ Use this package when you need to:
 - retrieve available actions from persisted state
 
 The server package does not reimplement workflow logic. It calls `applyWorkflowEvent()` from `@flowforge/core`.
+
+### `@flowforge/http`
+
+Owns HTTP transport between frontend clients and backend FlowForge runtimes.
+
+Use this package when you need to:
+
+- create a fetch-based workflow client
+- expose a FlowForge backend over standard Web `Request` and `Response`
+- keep React transport-agnostic
+- inject actor identity on the server
+- return structured FlowForge error responses
+
+The HTTP package does not import React. React does not import the HTTP package.
 
 ### `@flowforge/storage-memory`
 
@@ -128,6 +143,7 @@ The permit app demonstrates:
 - history
 - revisions
 - React rendering through `@flowforge/react`
+- HTTP client/handler mode through `?transport=http`
 - server/runtime calls through `@flowforge/server`
 - memory persistence through `@flowforge/storage-memory`
 - explicit reset behavior through `resetInstance()`
@@ -694,7 +710,16 @@ In Postgres storage, this is implemented with a real database transaction.
 - workflow history
 - idempotency results
 
-The package ships with `packages/storage-postgres/schema.sql` and exports `POSTGRES_WORKFLOW_SCHEMA_SQL`.
+The package ships with:
+
+- `packages/storage-postgres/schema.sql`
+- `packages/storage-postgres/migrations/0001_init.sql`
+- `POSTGRES_WORKFLOW_SCHEMA_SQL`
+- `runFlowForgePostgresMigrations()`
+- `checkFlowForgePostgresSchema()`
+- `storage.checkSchema()`
+
+FlowForge does not silently create Postgres tables by default. Production apps should run migrations explicitly and start storage with `autoMigrate: false`. Local development and tests can opt into `autoMigrate: true`.
 
 ## Error Types
 

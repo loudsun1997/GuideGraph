@@ -23,9 +23,66 @@ This adapter implements the `WorkflowStorage` interface from `@flowforge/server`
 The package ships with:
 
 - `schema.sql`
+- `migrations/0001_init.sql`
 - `POSTGRES_WORKFLOW_SCHEMA_SQL`
+- `runFlowForgePostgresMigrations()`
+- `checkFlowForgePostgresSchema()`
 
-Apply the SQL before constructing `PostgresWorkflowStorage`.
+For production, apply the schema or run migrations explicitly before starting the app:
+
+```sh
+psql "$DATABASE_URL" -f node_modules/@flowforge/storage-postgres/schema.sql
+```
+
+Or run migrations from setup/test code:
+
+```ts
+import { runFlowForgePostgresMigrations } from "@flowforge/storage-postgres";
+
+await runFlowForgePostgresMigrations({
+  connectionString: process.env.DATABASE_URL!,
+});
+```
+
+`schema.sql` includes the migration tracking table:
+
+```sql
+CREATE TABLE IF NOT EXISTS workflow_schema_migrations (
+  version TEXT PRIMARY KEY,
+  applied_at TIMESTAMPTZ NOT NULL
+);
+```
+
+## Schema Checks
+
+Check the schema at app startup to fail with a useful setup message:
+
+```ts
+import { PostgresWorkflowStorage } from "@flowforge/storage-postgres";
+
+const storage = new PostgresWorkflowStorage({
+  connectionString: process.env.DATABASE_URL!,
+  autoMigrate: false,
+});
+
+await storage.checkSchema();
+```
+
+If tables are missing, FlowForge throws `FlowForgePostgresSchemaError` with:
+
+```text
+FlowForge Postgres schema is not installed.
+
+Run one of:
+
+npx flowforge postgres init
+
+or:
+
+psql "$DATABASE_URL" -f node_modules/@flowforge/storage-postgres/schema.sql
+```
+
+## Local Development
 
 ```ts
 import { Pool } from "pg";
@@ -43,13 +100,30 @@ await pool.query(POSTGRES_WORKFLOW_SCHEMA_SQL);
 const storage = new PostgresWorkflowStorage(pool);
 ```
 
+For local development and tests only, you can opt into automatic migrations:
+
+```ts
+const storage = new PostgresWorkflowStorage({
+  connectionString: process.env.DATABASE_URL!,
+  autoMigrate: true,
+});
+```
+
+Do not use `autoMigrate: true` as the production default. Production deployments should run migrations explicitly.
+
 ## Usage With The Server
 
 ```ts
 import { createWorkflowServer } from "@flowforge/server";
 import { PostgresWorkflowStorage } from "@flowforge/storage-postgres";
 
-const storage = new PostgresWorkflowStorage(pool);
+const storage = new PostgresWorkflowStorage({
+  connectionString: process.env.DATABASE_URL!,
+  autoMigrate: false,
+});
+
+await storage.checkSchema();
+
 const server = createWorkflowServer({ storage });
 ```
 
@@ -63,6 +137,12 @@ The server still owns:
 
 The storage adapter owns durable reads and transactional commits.
 
+## Known Schema Decision
+
+`workflow_history.event_id` is not a foreign key in Phase 5 because `INSTANCE_CREATED` is currently stored as a history entry but not as a row in `workflow_events`.
+
+Long term, every history entry should be caused by a workflow event. Once `INSTANCE_CREATED` is persisted as a real workflow event, `workflow_history.event_id` should reference `workflow_events(id)` for stronger audit integrity.
+
 ## Running Tests
 
 The default Postgres adapter tests use `pg-mem`, so they do not require a local Postgres service.
@@ -70,6 +150,14 @@ The default Postgres adapter tests use `pg-mem`, so they do not require a local 
 ```sh
 pnpm test:postgres
 ```
+
+To test against a real local Postgres server, create `.env.local` with `DATABASE_URL`, then run:
+
+```sh
+pnpm test:postgres:real
+```
+
+See [REAL_POSTGRES_TESTS.md](./REAL_POSTGRES_TESTS.md) for the local test database setup.
 
 Run the full workspace checks with:
 

@@ -11,14 +11,17 @@
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run",
     "test:core": "vitest run packages/core/tests",
+    "test:http": "vitest run packages/http/tests",
     "test:server": "vitest run packages/server/tests",
     "test:postgres": "vitest run packages/storage-postgres/tests",
+    "test:postgres:real": "FLOWFORGE_REAL_POSTGRES=1 vitest run packages/storage-postgres/tests/postgresWorkflowStorage.real.test.ts",
     "clean": "tsc -b --clean"
   },
   "devDependencies": {
     "@types/node": "^22.13.1",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.2.3",
+    "pg": "^8.20.0",
     "pg-mem": "^3.0.14",
     "typescript": "^5.7.3",
     "vite": "^8.0.11",

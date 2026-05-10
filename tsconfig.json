@@ -14,6 +14,9 @@
       "path": "./packages/storage-postgres"
     },
     {
+      "path": "./packages/http"
+    },
+    {
       "path": "./packages/react"
     },
     {

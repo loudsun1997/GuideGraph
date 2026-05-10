@@ -1,8 +1,3 @@
-CREATE TABLE IF NOT EXISTS workflow_schema_migrations (
-  version TEXT PRIMARY KEY,
-  applied_at TIMESTAMPTZ NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS workflow_instances (
   id TEXT PRIMARY KEY,
   workflow_id TEXT NOT NULL,
@@ -65,7 +60,3 @@ CREATE INDEX IF NOT EXISTS workflow_instances_workflow_id_updated_at_idx
 
 CREATE INDEX IF NOT EXISTS workflow_instances_status_updated_at_idx
   ON workflow_instances (status, updated_at DESC, id);
-
-INSERT INTO workflow_schema_migrations (version, applied_at)
-VALUES ('0001_init', now())
-ON CONFLICT (version) DO NOTHING;

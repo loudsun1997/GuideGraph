@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import type { WorkflowEvent, WorkflowHistoryEntry, WorkflowInstance, WorkflowStepState } from "@flowforge/core";
 import {
   WorkflowServerError,
@@ -29,11 +30,56 @@ export interface PostgresConnection extends PostgresQueryable {
   connect?: () => Promise<PostgresTransactionClient>;
 }
 
-export interface PostgresWorkflowStorageOptions {
+export interface ManagedPostgresConnection {
+  readonly connection: PostgresConnection;
+  readonly dispose?: () => Promise<void>;
+}
+
+export interface PostgresWorkflowStorageConfig {
+  readonly connection?: PostgresConnection;
+  readonly connectionString?: string;
+  readonly autoMigrate?: boolean;
   readonly schema?: string;
 }
 
-export const POSTGRES_WORKFLOW_SCHEMA_SQL = `
+export type PostgresWorkflowStorageInput = PostgresConnection | PostgresWorkflowStorageConfig;
+
+export interface FlowForgePostgresMigration {
+  readonly version: string;
+  readonly sql: string;
+}
+
+export interface FlowForgePostgresSetupOptions {
+  readonly connection?: PostgresConnection;
+  readonly connectionString?: string;
+  readonly schema?: string;
+}
+
+export interface FlowForgePostgresSchemaCheckResult {
+  readonly ok: boolean;
+  readonly missingTables: readonly string[];
+}
+
+export class FlowForgePostgresSchemaError extends Error {
+  readonly missingTables: readonly string[];
+
+  constructor(missingTables: readonly string[]) {
+    super(
+      `FlowForge Postgres schema is not installed.\n\nMissing tables: ${missingTables.join(", ")}.\n\nRun one of:\n\nnpx flowforge postgres init\n\nor:\n\npsql "$DATABASE_URL" -f node_modules/@flowforge/storage-postgres/schema.sql`
+    );
+    this.name = "FlowForgePostgresSchemaError";
+    this.missingTables = missingTables;
+  }
+}
+
+const FLOWFORGE_POSTGRES_SCHEMA_TABLE_SQL = `
+CREATE TABLE IF NOT EXISTS workflow_schema_migrations (
+  version TEXT PRIMARY KEY,
+  applied_at TIMESTAMPTZ NOT NULL
+);
+`;
+
+const FLOWFORGE_POSTGRES_BASE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS workflow_instances (
   id TEXT PRIMARY KEY,
   workflow_id TEXT NOT NULL,
@@ -77,7 +123,7 @@ CREATE TABLE IF NOT EXISTS workflow_history (
 );
 
 CREATE TABLE IF NOT EXISTS workflow_idempotency_results (
-  instance_id TEXT NOT NULL,
+  instance_id TEXT NOT NULL REFERENCES workflow_instances(id) ON DELETE CASCADE,
   idempotency_key TEXT NOT NULL,
   event_fingerprint TEXT NOT NULL,
   result JSONB NOT NULL,
@@ -90,17 +136,60 @@ CREATE INDEX IF NOT EXISTS workflow_events_instance_id_occurred_at_idx
 
 CREATE INDEX IF NOT EXISTS workflow_history_instance_id_occurred_at_idx
   ON workflow_history (instance_id, occurred_at, id);
+
+CREATE INDEX IF NOT EXISTS workflow_instances_workflow_id_updated_at_idx
+  ON workflow_instances (workflow_id, updated_at DESC, id);
+
+CREATE INDEX IF NOT EXISTS workflow_instances_status_updated_at_idx
+  ON workflow_instances (status, updated_at DESC, id);
 `;
 
-export class PostgresWorkflowStorage implements WorkflowStorage {
-  readonly #db: PostgresConnection;
+export const FLOWFORGE_POSTGRES_MIGRATIONS: readonly FlowForgePostgresMigration[] = [
+  {
+    version: "0001_init",
+    sql: FLOWFORGE_POSTGRES_BASE_SCHEMA_SQL
+  }
+];
 
-  constructor(db: PostgresConnection, _options: PostgresWorkflowStorageOptions = {}) {
-    this.#db = db;
+export const POSTGRES_WORKFLOW_SCHEMA_SQL = `${FLOWFORGE_POSTGRES_SCHEMA_TABLE_SQL}
+${FLOWFORGE_POSTGRES_BASE_SCHEMA_SQL}
+INSERT INTO workflow_schema_migrations (version, applied_at)
+VALUES ('0001_init', now())
+ON CONFLICT (version) DO NOTHING;
+`;
+
+const REQUIRED_FLOWFORGE_POSTGRES_TABLES = [
+  "workflow_schema_migrations",
+  "workflow_instances",
+  "workflow_events",
+  "workflow_history",
+  "workflow_idempotency_results"
+] as const;
+
+export class PostgresWorkflowStorage implements WorkflowStorage {
+  readonly #connection: Promise<ManagedPostgresConnection>;
+  readonly #schema: string;
+  readonly #ready: Promise<void>;
+
+  constructor(input: PostgresWorkflowStorageInput, options: PostgresWorkflowStorageConfig = {}) {
+    const config = isPostgresConnection(input) ? { ...options, connection: input } : input;
+
+    this.#schema = config.schema ?? "public";
+    this.#connection = resolveManagedConnection(config);
+    this.#ready = config.autoMigrate
+      ? this.#connection.then(({ connection }) =>
+          runFlowForgePostgresMigrations({
+            connection,
+            schema: this.#schema
+          })
+        )
+      : Promise.resolve();
   }
 
   async commitInstanceCreation(input: CommitWorkflowInstanceCreationInput): Promise<void> {
-    await this.#transaction(async (client) => {
+    const db = await this.#db();
+
+    await withTransaction(db, async (client) => {
       await upsertInstance(client, input.instance);
       await client.query("delete from workflow_events where instance_id = $1", [input.instance.id]);
       await client.query("delete from workflow_history where instance_id = $1", [input.instance.id]);
@@ -115,7 +204,8 @@ export class PostgresWorkflowStorage implements WorkflowStorage {
   }
 
   async getInstance(instanceId: string): Promise<WorkflowInstance | undefined> {
-    const result = await this.#db.query<WorkflowInstanceRow>(
+    const db = await this.#db();
+    const result = await db.query<WorkflowInstanceRow>(
       `select id, workflow_id, workflow_version, status, active_step_ids, step_states,
         created_at, updated_at, revision
        from workflow_instances
@@ -132,7 +222,9 @@ export class PostgresWorkflowStorage implements WorkflowStorage {
   }
 
   async commitEvent(input: CommitWorkflowEventInput): Promise<void> {
-    await this.#transaction(async (client) => {
+    const db = await this.#db();
+
+    await withTransaction(db, async (client) => {
       await updateInstanceForEvent(client, input.instance, input.event.revisionBefore);
       await insertWorkflowEvent(client, input.event);
       await insertHistoryEntry(client, input.historyEntry);
@@ -144,7 +236,8 @@ export class PostgresWorkflowStorage implements WorkflowStorage {
   }
 
   async listEvents(instanceId: string): Promise<StoredWorkflowEvent[]> {
-    const result = await this.#db.query<WorkflowEventRow>(
+    const db = await this.#db();
+    const result = await db.query<WorkflowEventRow>(
       `select id, instance_id, type, step_id, actor_id, metadata, idempotency_key, occurred_at
        from workflow_events
        where instance_id = $1
@@ -156,7 +249,8 @@ export class PostgresWorkflowStorage implements WorkflowStorage {
   }
 
   async listHistory(instanceId: string): Promise<WorkflowHistoryEntry[]> {
-    const result = await this.#db.query<WorkflowHistoryRow>(
+    const db = await this.#db();
+    const result = await db.query<WorkflowHistoryRow>(
       `select id, event_id, instance_id, type, step_id, actor_id, message, occurred_at
        from workflow_history
        where instance_id = $1
@@ -174,7 +268,8 @@ export class PostgresWorkflowStorage implements WorkflowStorage {
     instanceId: string,
     idempotencyKey: string
   ): Promise<StoredIdempotencyRecord | undefined> {
-    const result = await this.#db.query<IdempotencyRecordRow>(
+    const db = await this.#db();
+    const result = await db.query<IdempotencyRecordRow>(
       `select result
        from workflow_idempotency_results
        where instance_id = $1 and idempotency_key = $2`,
@@ -189,27 +284,155 @@ export class PostgresWorkflowStorage implements WorkflowStorage {
     return jsonValue<StoredIdempotencyRecord>(row.result);
   }
 
-  async #transaction<T>(work: (client: PostgresQueryable) => Promise<T>): Promise<T> {
-    const client = this.#db.connect ? await this.#db.connect() : this.#db;
+  async checkSchema(): Promise<FlowForgePostgresSchemaCheckResult> {
+    const db = await this.#db();
+    return checkFlowForgePostgresSchema({
+      connection: db,
+      schema: this.#schema
+    });
+  }
 
-    try {
-      await client.query("begin");
-      const result = await work(client);
-      await client.query("commit");
-      return result;
-    } catch (error) {
-      await client.query("rollback");
-      throw error;
-    } finally {
-      if ("release" in client) {
-        client.release?.();
+  async #db(): Promise<PostgresConnection> {
+    await this.#ready;
+    return (await this.#connection).connection;
+  }
+}
+
+export function createPostgresWorkflowStorage(input: PostgresWorkflowStorageInput): WorkflowStorage {
+  return new PostgresWorkflowStorage(input);
+}
+
+export async function runFlowForgePostgresMigrations(
+  options: FlowForgePostgresSetupOptions
+): Promise<void> {
+  const managed = await resolveManagedConnection(options);
+
+  try {
+    await withTransaction(managed.connection, async (client) => {
+      await client.query(FLOWFORGE_POSTGRES_SCHEMA_TABLE_SQL);
+
+      for (const migration of FLOWFORGE_POSTGRES_MIGRATIONS) {
+        const applied = await client.query<{ version: string }>(
+          "select version from workflow_schema_migrations where version = $1",
+          [migration.version]
+        );
+
+        if (applied.rows.length > 0) {
+          continue;
+        }
+
+        await client.query(migration.sql);
+        await client.query(
+          "insert into workflow_schema_migrations (version, applied_at) values ($1, now())",
+          [migration.version]
+        );
       }
+    });
+  } finally {
+    await managed.dispose?.();
+  }
+}
+
+export async function checkFlowForgePostgresSchema(
+  options: FlowForgePostgresSetupOptions
+): Promise<FlowForgePostgresSchemaCheckResult> {
+  const managed = await resolveManagedConnection(options);
+  const schema = options.schema ?? "public";
+
+  try {
+    const result = await managed.connection.query<{ table_name: string }>(
+      `select table_name
+       from information_schema.tables
+       where table_schema = $1
+         and table_name in (
+           'workflow_schema_migrations',
+           'workflow_instances',
+           'workflow_events',
+           'workflow_history',
+           'workflow_idempotency_results'
+         )`,
+      [schema]
+    );
+    const existingTables = new Set(result.rows.map((row) => row.table_name));
+    const missingTables = REQUIRED_FLOWFORGE_POSTGRES_TABLES.filter(
+      (tableName) => !existingTables.has(tableName)
+    );
+
+    if (missingTables.length > 0) {
+      throw new FlowForgePostgresSchemaError(missingTables);
+    }
+
+    return {
+      ok: true,
+      missingTables: []
+    };
+  } finally {
+    await managed.dispose?.();
+  }
+}
+
+async function withTransaction<T>(
+  db: PostgresConnection,
+  work: (client: PostgresQueryable) => Promise<T>
+): Promise<T> {
+  const client = db.connect ? await db.connect() : db;
+
+  try {
+    await client.query("begin");
+    const result = await work(client);
+    await client.query("commit");
+    return result;
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    if ("release" in client) {
+      client.release?.();
     }
   }
 }
 
-export function createPostgresWorkflowStorage(db: PostgresConnection): WorkflowStorage {
-  return new PostgresWorkflowStorage(db);
+function isPostgresConnection(input: PostgresWorkflowStorageInput): input is PostgresConnection {
+  return typeof (input as PostgresConnection).query === "function";
+}
+
+async function resolveManagedConnection(
+  options: FlowForgePostgresSetupOptions
+): Promise<ManagedPostgresConnection> {
+  if (options.connection) {
+    return { connection: options.connection };
+  }
+
+  if (options.connectionString) {
+    return createPgConnection(options.connectionString);
+  }
+
+  throw new Error("PostgresWorkflowStorage requires either a connection or a connectionString.");
+}
+
+async function createPgConnection(connectionString: string): Promise<ManagedPostgresConnection> {
+  const require = createRequire(import.meta.url);
+  let pg: { Pool?: new (options: { connectionString: string }) => PostgresConnection & { end?: () => Promise<void> } };
+
+  try {
+    pg = require("pg") as typeof pg;
+  } catch (error) {
+    throw new Error(
+      "The pg package is required when using a connectionString. Install it with: pnpm add pg",
+      { cause: error }
+    );
+  }
+
+  if (!pg.Pool) {
+    throw new Error("The pg package did not export Pool.");
+  }
+
+  const pool = new pg.Pool({ connectionString });
+
+  return {
+    connection: pool,
+    ...(pool.end ? { dispose: () => pool.end?.() ?? Promise.resolve() } : {})
+  };
 }
 
 async function upsertInstance(client: PostgresQueryable, instance: WorkflowInstance): Promise<void> {

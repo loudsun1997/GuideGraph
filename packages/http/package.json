@@ -1,7 +1,7 @@
 {
-  "name": "@flowforge/storage-postgres",
+  "name": "@flowforge/http",
   "version": "0.1.0",
-  "description": "Postgres workflow storage for FlowForge.",
+  "description": "HTTP transport for FlowForge clients and servers.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -12,26 +12,16 @@
     }
   },
   "files": [
-    "dist",
-    "schema.sql",
-    "migrations"
+    "dist"
   ],
   "scripts": {
     "build": "tsc -b",
-    "typecheck": "tsc -b --pretty false",
     "test": "vitest run tests",
+    "typecheck": "tsc -b --pretty false",
     "clean": "tsc -b --clean"
   },
   "dependencies": {
     "@flowforge/core": "workspace:*",
     "@flowforge/server": "workspace:*"
-  },
-  "peerDependencies": {
-    "pg": ">=8"
-  },
-  "peerDependenciesMeta": {
-    "pg": {
-      "optional": true
-    }
   }
 }

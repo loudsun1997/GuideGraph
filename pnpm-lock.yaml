@@ -24,6 +24,9 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.3
         version: 19.2.3(@types/react@19.2.14)
+      pg:
+        specifier: ^8.20.0
+        version: 8.20.0
       pg-mem:
         specifier: ^3.0.14
         version: 3.0.14
@@ -42,6 +45,9 @@ importers:
       '@flowforge/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@flowforge/http':
+        specifier: workspace:*
+        version: link:../../packages/http
       '@flowforge/react':
         specifier: workspace:*
         version: link:../../packages/react
@@ -79,6 +85,15 @@ importers:
         specifier: workspace:*
         version: link:../core
 
+  packages/http:
+    dependencies:
+      '@flowforge/core':
+        specifier: workspace:*
+        version: link:../core
+      '@flowforge/server':
+        specifier: workspace:*
+        version: link:../server
+
   packages/react:
     dependencies:
       '@flowforge/core':
@@ -108,6 +123,9 @@ importers:
       '@flowforge/core':
         specifier: workspace:*
         version: link:../core
+      '@flowforge/server':
+        specifier: workspace:*
+        version: link:../server
       pg:
         specifier: '>=8'
         version: 8.20.0
