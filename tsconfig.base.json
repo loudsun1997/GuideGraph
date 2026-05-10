@@ -1,0 +1,45 @@
+{
+  "compilerOptions": {
+    "allowSyntheticDefaultImports": true,
+    "baseUrl": ".",
+    "declaration": true,
+    "declarationMap": true,
+    "exactOptionalPropertyTypes": true,
+    "lib": [
+      "ES2023",
+      "DOM"
+    ],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "newLine": "lf",
+    "noEmitOnError": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true,
+    "paths": {
+      "@flowforge/core": [
+        "packages/core/src/index.ts"
+      ],
+      "@flowforge/devtools": [
+        "packages/devtools/src/index.ts"
+      ],
+      "@flowforge/react": [
+        "packages/react/src/index.ts"
+      ],
+      "@flowforge/server": [
+        "packages/server/src/index.ts"
+      ],
+      "@flowforge/storage-memory": [
+        "packages/storage-memory/src/index.ts"
+      ],
+      "@flowforge/storage-postgres": [
+        "packages/storage-postgres/src/index.ts"
+      ]
+    },
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2023",
+    "verbatimModuleSyntax": true
+  }
+}

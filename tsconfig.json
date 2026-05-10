@@ -1,0 +1,23 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./packages/core"
+    },
+    {
+      "path": "./packages/server"
+    },
+    {
+      "path": "./packages/storage-memory"
+    },
+    {
+      "path": "./packages/storage-postgres"
+    },
+    {
+      "path": "./packages/react"
+    },
+    {
+      "path": "./packages/devtools"
+    }
+  ]
+}
