@@ -96,9 +96,16 @@ React is optional. Core and server do not depend on React.
 
 ### `@flowforge/storage-postgres`
 
-Placeholder package for a future Postgres storage adapter.
+Provides a Postgres implementation of the server storage interface.
 
-The package exists, but full Postgres persistence is not implemented yet.
+Use this package when you need:
+
+- durable workflow instance persistence
+- durable event logs
+- durable history logs
+- idempotency result caching for retries
+- transactional event commits
+- data that survives process restarts
 
 ### `@flowforge/devtools`
 
@@ -678,7 +685,16 @@ cache idempotency result
 
 In memory storage, this is implemented with snapshot/restore behavior.
 
-In future Postgres storage, this should be implemented with a real database transaction.
+In Postgres storage, this is implemented with a real database transaction.
+
+`@flowforge/storage-postgres` persists:
+
+- workflow instances
+- workflow events
+- workflow history
+- idempotency results
+
+The package ships with `packages/storage-postgres/schema.sql` and exports `POSTGRES_WORKFLOW_SCHEMA_SQL`.
 
 ## Error Types
 
@@ -865,6 +881,8 @@ FlowForge currently supports:
 - server runtime wrapper
 - memory storage
 - conceptually transactional event commits
+- Postgres-backed storage
+- transactional Postgres event commits
 - idempotency handling
 - revision conflict handling
 - stable server error codes
@@ -883,7 +901,6 @@ These features are not currently supported:
 - per-step undo
 - per-branch undo
 - compensating actions
-- Postgres-backed storage
 - no-code workflow editor
 - visual graph editor
 - drag-and-drop workflow builder
@@ -1006,6 +1023,12 @@ Current tests cover:
 - workflow definition mismatch
 - old instance immutability
 - available actions from persisted state
+- Postgres instance creation/loading
+- Postgres event log persistence
+- Postgres history persistence
+- Postgres idempotency caching
+- Postgres transactional rollback
+- Postgres persistence across a new storage adapter instance
 
 Run all tests:
 
@@ -1023,6 +1046,12 @@ Run server/storage tests:
 
 ```sh
 pnpm test:server
+```
+
+Run Postgres storage tests:
+
+```sh
+pnpm test:postgres
 ```
 
 ## Build and Verification
@@ -1063,4 +1092,4 @@ FlowForge is currently guided by these rules:
 7. Retry loops are normal workflow transitions.
 8. Undo/redo should be framework-owned when implemented.
 9. Memory storage is for local development and tests.
-10. Postgres storage should eventually provide real transactional persistence.
+10. Postgres storage provides durable transactional persistence.

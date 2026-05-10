@@ -26,7 +26,7 @@ For a detailed list of supported features, unsupported features, package respons
 
 - `@flowforge/core`: workflow definitions, execution primitives, and storage contracts.
 - `@flowforge/react`: React hooks for running workflows from UI code.
-- `@flowforge/server`: a tiny HTTP adapter for exposing workflow health and metadata.
+- `@flowforge/server`: runtime API that creates instances, sends events, enforces revisions, and calls the core engine.
 - `@flowforge/storage-memory`: in-memory workflow storage for tests and local development.
 - `@flowforge/storage-postgres`: Postgres-backed workflow storage adapter.
 - `@flowforge/devtools`: event collection helpers for workflow debugging tools.
@@ -46,6 +46,20 @@ http://127.0.0.1:5173/
 ```
 
 The example demonstrates concurrent steps, merge blocking, branch decisions, retry loops, history, revisions, server runtime usage, memory storage, and React bindings.
+
+## Postgres Storage
+
+`@flowforge/storage-postgres` adds production-shaped persistence for workflow instances, events, history entries, and idempotency results. The adapter implements the `WorkflowStorage` interface from `@flowforge/server`; it does not duplicate workflow engine behavior.
+
+The schema lives in `packages/storage-postgres/schema.sql` and is also exported as `POSTGRES_WORKFLOW_SCHEMA_SQL`.
+
+Run the adapter tests with:
+
+```sh
+pnpm test:postgres
+```
+
+The current tests use `pg-mem`, so they do not require a local Postgres service.
 
 ## Core Example
 

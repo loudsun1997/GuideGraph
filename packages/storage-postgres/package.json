@@ -12,15 +12,18 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "schema.sql"
   ],
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b --pretty false",
+    "test": "vitest run tests",
     "clean": "tsc -b --clean"
   },
   "dependencies": {
-    "@flowforge/core": "workspace:*"
+    "@flowforge/core": "workspace:*",
+    "@flowforge/server": "workspace:*"
   },
   "peerDependencies": {
     "pg": ">=8"
