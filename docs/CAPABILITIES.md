@@ -10,6 +10,7 @@ workflow definition
   -> send workflow events
   -> core engine calculates next state
   -> server persists instance, events, history, idempotency records
+  -> optional HTTP transport exposes the runtime to browser clients
   -> React renders persisted state and sends actions back through the server
 ```
 
@@ -21,9 +22,11 @@ The most important rule is that applications should not mutate workflow state di
 @flowforge/core
 @flowforge/server
 @flowforge/http
+@flowforge/graph
 @flowforge/storage-memory
 @flowforge/react
 @flowforge/storage-postgres
+@flowforge/react-graph
 @flowforge/devtools
 examples/permit-app
 ```
@@ -100,6 +103,7 @@ Use this package when you want to:
 
 - create workflow-driven React UIs
 - use a `WorkflowProvider`
+- use `useWorkflow()`, `useWorkflowActions()`, `useWorkflowHistory()`, and `useOptionalWorkflow()`
 - read workflow state with hooks
 - render current active steps
 - render available actions
@@ -108,6 +112,36 @@ Use this package when you want to:
 - render a simple status list
 
 React is optional. Core and server do not depend on React.
+
+### `@flowforge/graph`
+
+Provides renderer-agnostic workflow graph data.
+
+Use this package when you want to:
+
+- convert workflow definitions and instances into graph nodes and edges
+- distinguish dependency edges from transition edges
+- map step state to graph status
+- expose blocked reasons and missing prerequisite ids
+- mark terminal steps, visited nodes, and loop edges
+- feed your own renderer, such as React Flow, Cytoscape, Mermaid, D3, or custom SVG
+
+This package does not depend on React, React Flow, or ELK.
+
+### `@flowforge/react-graph`
+
+Provides the optional drop-in graph renderer for React apps.
+
+Use this package when you want to:
+
+- render `<WorkflowGraph />`
+- use React Flow for pan, zoom, controls, nodes, and edges
+- use ELK.js for automatic layered layout
+- visualize active, completed, blocked, waiting, failed, skipped, and not-started states
+- inspect selected step details, blockers, dependency progress, outcomes, actions, and history
+- keep graph dependencies out of the base `@flowforge/react` package
+
+This package depends on `@flowforge/graph`, `@flowforge/react`, `@xyflow/react`, and `elkjs`. Install it only when you want the built-in graph UI.
 
 ### `@flowforge/storage-postgres`
 
@@ -138,6 +172,12 @@ The permit app demonstrates:
 - concurrent start steps
 - merge blocking
 - merge unlocking
+- workflow graph visualization
+- dedicated graph use-case showcase
+- graph selected-step inspector
+- graph blocked-reason panel
+- graph branch/outcome panel
+- graph history/visited-path panel
 - review branching
 - rejection retry loop
 - history
@@ -483,6 +523,82 @@ This returns:
 
 The server wraps this with persistence, idempotency, revision checking, and history storage.
 
+## HTTP Transport
+
+`@flowforge/http` lets browser clients talk to a backend FlowForge runtime over HTTP.
+
+The intended architecture is:
+
+```text
+React UI
+  -> createHttpWorkflowClient()
+  -> createFlowForgeHttpHandler()
+  -> @flowforge/server
+  -> @flowforge/storage-memory or @flowforge/storage-postgres
+```
+
+Create a browser client:
+
+```ts
+import { createHttpWorkflowClient } from "@flowforge/http";
+
+const client = createHttpWorkflowClient({
+  baseUrl: "/api/flowforge",
+  getHeaders: async () => ({
+    Authorization: `Bearer ${token}`
+  })
+});
+```
+
+Create a backend handler:
+
+```ts
+import { createFlowForgeHttpHandler } from "@flowforge/http";
+import { createWorkflowServer } from "@flowforge/server";
+
+const workflowServer = createWorkflowServer({ storage });
+
+const handler = createFlowForgeHttpHandler({
+  workflowServer,
+  definitions: [permitWorkflow],
+  basePath: "/api/flowforge",
+  getActorId: async (request) => {
+    return "demo_user";
+  }
+});
+
+const response = await handler.handle(request);
+```
+
+Supported routes:
+
+```text
+POST /instances
+GET /instances/:instanceId
+POST /instances/:instanceId/events
+GET /instances/:instanceId/history
+GET /instances/:instanceId/actions
+POST /instances/:instanceId/reset
+```
+
+Actor identity is injected server-side through `getActorId(request)`. The host app owns real authentication and authorization.
+
+HTTP errors use this shape:
+
+```json
+{
+  "error": {
+    "code": "REVISION_CONFLICT",
+    "message": "Expected revision 1, but instance wf_123 is at revision 2.",
+    "details": {
+      "instanceId": "wf_123"
+    }
+  }
+}
+```
+
+The HTTP client throws `FlowForgeHttpError` with `code`, `message`, `status`, and optional `details`.
+
 ## Available Actions
 
 FlowForge can calculate what the user can do next.
@@ -723,9 +839,9 @@ FlowForge does not silently create Postgres tables by default. Production apps s
 
 ## Error Types
 
-The server exports stable error codes.
+The server exports stable runtime error codes.
 
-Current error codes:
+Current server error codes:
 
 ```text
 INSTANCE_NOT_FOUND
@@ -745,6 +861,35 @@ try {
     console.log(error.code);
   }
 }
+```
+
+`@flowforge/http` adds transport-level error codes:
+
+```text
+UNKNOWN_WORKFLOW_DEFINITION
+DEFINITION_VERSION_MISMATCH
+INVALID_REQUEST
+METHOD_NOT_ALLOWED
+NOT_FOUND
+SCHEMA_NOT_INSTALLED
+STORAGE_COMMIT_FAILED
+INTERNAL_ERROR
+```
+
+Known HTTP status mappings include:
+
+```text
+INSTANCE_NOT_FOUND -> 404
+UNKNOWN_WORKFLOW_DEFINITION -> 404
+INVALID_REQUEST -> 400
+INVALID_EVENT -> 400
+REVISION_CONFLICT -> 409
+IDEMPOTENCY_CONFLICT -> 409
+DEFINITION_VERSION_MISMATCH -> 409
+METHOD_NOT_ALLOWED -> 405
+NOT_FOUND -> 404
+STORAGE_ERROR -> 500
+INTERNAL_ERROR -> 500
 ```
 
 ## React Usage
@@ -852,6 +997,65 @@ These are intentionally simple. They are meant to prove the API is usable from a
 
 The React package depends on a `WorkflowClient` interface. It does not depend on the server implementation. The permit app uses a local client adapter that wraps `createWorkflowServer()` for demo purposes.
 
+## Graph Packages
+
+FlowForge graph support is split into two layers.
+
+### Graph Data
+
+Use `@flowforge/graph` when you want renderer-agnostic graph data:
+
+```ts
+import { buildWorkflowGraph } from "@flowforge/graph";
+
+const graph = buildWorkflowGraph({
+  definition: permitWorkflow,
+  instance,
+  history
+});
+```
+
+The graph model includes:
+
+- step nodes
+- dependency edges
+- transition edges
+- active/completed/blocked/waiting/not-started/failed/skipped statuses
+- blocked reasons
+- missing prerequisite ids
+- terminal step markers
+- visited node/edge hints
+- retry loop markers
+
+`@flowforge/graph` does not depend on React, React Flow, or ELK.
+
+### React Graph UI
+
+Use `@flowforge/react-graph` when you want the built-in graph UI:
+
+```tsx
+import { WorkflowGraph } from "@flowforge/react-graph";
+
+<WorkflowGraph />;
+```
+
+`<WorkflowGraph />` can read from `WorkflowProvider`, or you can pass `definition`, `instance`, `history`, and `availableActions` directly.
+
+It currently provides:
+
+- React Flow canvas
+- ELK layered layout
+- selected-node inspector
+- blocked-step explanation
+- dependency progress display
+- available actions for the selected step
+- branch/outcome panel
+- history panel
+- visited/loop edge styling
+- status and edge legend
+
+The graph renderer is optional. Apps that do not need it can use only `@flowforge/react`, or they can use `@flowforge/graph` with their own renderer.
+
 ## Example App
 
 Run the permit app:
@@ -882,6 +1086,13 @@ The app demonstrates:
 12. Return to `submitApplication`.
 13. Resubmit and approve.
 
+The app also includes a static graph use-case showcase above the live workflow area. It demonstrates:
+
+1. Concurrent active intake steps.
+2. Blocked merge with missing prerequisites and dependency progress.
+3. City Review approve/reject branch outcomes.
+4. Retry loop with workflow history and visited path.
+
 The demo uses in-memory storage. Refreshing the page clears the workflow state.
 
 ## Supported Today
@@ -904,6 +1115,10 @@ FlowForge currently supports:
 - revision incrementing
 - invalid event rejection
 - server runtime wrapper
+- HTTP client
+- HTTP handler
+- standard Web `Request`/`Response` transport
+- actor id injection through HTTP handler
 - memory storage
 - conceptually transactional event commits
 - Postgres-backed storage
@@ -913,6 +1128,11 @@ FlowForge currently supports:
 - stable server error codes
 - React provider and hooks
 - simple React workflow components
+- optional React workflow graph
+- graph model conversion utility
+- graph selected-node inspector
+- graph blocked-reason/outcome/history panels
+- dedicated permit graph use-case showcase
 - end-to-end permit app example
 
 ## Not Supported Yet
@@ -1054,6 +1274,14 @@ Current tests cover:
 - Postgres idempotency caching
 - Postgres transactional rollback
 - Postgres persistence across a new storage adapter instance
+- workflow graph conversion
+- graph status mapping
+- graph loops and branch edges
+- graph selected-node React Flow mapping
+- graph dependency/loop edge class mapping
+- HTTP create/get/send/history/actions/reset routes
+- HTTP structured error handling
+- HTTP idempotency and revision behavior
 
 Run all tests:
 
@@ -1077,6 +1305,18 @@ Run Postgres storage tests:
 
 ```sh
 pnpm test:postgres
+```
+
+Run HTTP tests:
+
+```sh
+pnpm test:http
+```
+
+Run graph tests:
+
+```sh
+pnpm test:graph
 ```
 
 ## Build and Verification
@@ -1112,9 +1352,11 @@ FlowForge is currently guided by these rules:
 2. Server owns runtime orchestration.
 3. Storage owns persistence.
 4. React owns rendering and user interaction.
-5. Apps should send events, not mutate workflow state directly.
-6. History should be framework-owned.
-7. Retry loops are normal workflow transitions.
-8. Undo/redo should be framework-owned when implemented.
-9. Memory storage is for local development and tests.
-10. Postgres storage provides durable transactional persistence.
+5. HTTP owns transport, not workflow behavior.
+6. Graph packages own visualization, not workflow behavior.
+7. Apps should send events, not mutate workflow state directly.
+8. History should be framework-owned.
+9. Retry loops are normal workflow transitions.
+10. Undo/redo should be framework-owned when implemented.
+11. Memory storage is for local development and tests.
+12. Postgres storage provides durable transactional persistence.

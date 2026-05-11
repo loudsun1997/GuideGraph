@@ -22,8 +22,47 @@ Expected initial page:
 
 - Header says `Permit Application`.
 - Button says `Create Instance`.
+- A graph use-case showcase appears above the live workflow area.
 - Page says the first state activates `fillForm`, `uploadDocuments`, and `payFee`.
 - Page notes that demo storage is in-memory and refresh clears the workflow.
+
+## Graph Use-Case Showcase
+
+The showcase is intentionally static. It demonstrates FlowForge graph behavior even before the live workflow reaches those exact states.
+
+1. Click `Concurrent`.
+
+Expected:
+
+- The canvas shows `Fill Form`, `Upload Documents`, and `Pay Fee` as parallel active steps.
+- The merge target is blocked.
+- The right panel explains concurrent active steps.
+
+2. Click `Merge`.
+
+Expected:
+
+- The canvas shows `Submit Application` blocked.
+- The blocked node shows `2/3 complete`.
+- The right panel explains why the step is blocked.
+- `Pay Fee` is shown as the missing prerequisite.
+
+3. Click `Diverge`.
+
+Expected:
+
+- The canvas centers on `City Review`.
+- The approval path leads to `Permit Approved`.
+- The rejection path leads to `Fix Issues` and `Resubmit`.
+- The right panel shows possible outcomes.
+
+4. Click `Loop`.
+
+Expected:
+
+- The canvas shows a visited path through submit, rejection, fix, resubmit, and approval.
+- The right panel shows workflow history entries.
+- The retry loop is labeled.
 
 ## Create Instance
 
@@ -241,4 +280,4 @@ Expected:
 - Refreshing the browser page clears the current workflow.
 - The page returns to the pre-instance state with the `Create Instance` button.
 
-This is expected for Phase 4. Production persistence is not part of this demo.
+This is expected. The demo intentionally uses memory storage even though the workspace also includes the Postgres adapter.

@@ -10,8 +10,10 @@ import {
   WorkflowTimeline,
   useWorkflow
 } from "@flowforge/react";
+import { WorkflowGraph } from "@flowforge/react-graph";
 import type { WorkflowStepStatus } from "@flowforge/core";
 import { permitWorkflow } from "./permitWorkflow.js";
+import { WorkflowUseCaseShowcase } from "./WorkflowUseCaseShowcase.js";
 import { createHttpDemoWorkflowClient, createLocalWorkflowClient } from "./workflowClient.js";
 import "./styles.css";
 
@@ -57,6 +59,7 @@ function PermitWorkflow() {
       </header>
 
       {error ? <p className="error-message">{error.message}</p> : null}
+      <WorkflowUseCaseShowcase />
 
       {instance ? (
         <>
@@ -65,6 +68,7 @@ function PermitWorkflow() {
           <section className="workflow-grid">
             <div className="workflow-main">
               <CurrentStepCard />
+              <WorkflowGraph />
               <WorkflowStatusList />
               <WorkflowTimeline />
             </div>

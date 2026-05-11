@@ -24,11 +24,17 @@
       "@flowforge/devtools": [
         "packages/devtools/src/index.ts"
       ],
+      "@flowforge/graph": [
+        "packages/graph/src/index.ts"
+      ],
       "@flowforge/http": [
         "packages/http/src/index.ts"
       ],
       "@flowforge/react": [
         "packages/react/src/index.tsx"
+      ],
+      "@flowforge/react-graph": [
+        "packages/react-graph/src/index.tsx"
       ],
       "@flowforge/server": [
         "packages/server/src/index.ts"

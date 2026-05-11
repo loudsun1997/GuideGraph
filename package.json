@@ -11,6 +11,7 @@
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run",
     "test:core": "vitest run packages/core/tests",
+    "test:graph": "vitest run packages/graph/tests packages/react-graph/tests",
     "test:http": "vitest run packages/http/tests",
     "test:server": "vitest run packages/server/tests",
     "test:postgres": "vitest run packages/storage-postgres/tests",

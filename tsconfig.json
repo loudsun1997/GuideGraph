@@ -23,6 +23,12 @@
       "path": "./packages/devtools"
     },
     {
+      "path": "./packages/graph"
+    },
+    {
+      "path": "./packages/react-graph"
+    },
+    {
       "path": "./examples/permit-app"
     }
   ]

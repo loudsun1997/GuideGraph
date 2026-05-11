@@ -1,0 +1,33 @@
+{
+  "name": "@flowforge/react-graph",
+  "version": "0.1.0",
+  "description": "Optional React Flow graph renderer for FlowForge.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run tests",
+    "typecheck": "tsc -b --pretty false",
+    "clean": "tsc -b --clean"
+  },
+  "dependencies": {
+    "@flowforge/graph": "workspace:*",
+    "@flowforge/react": "workspace:*",
+    "@xyflow/react": "^12.10.2",
+    "elkjs": "^0.11.1"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  }
+}

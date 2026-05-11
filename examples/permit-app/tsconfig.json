@@ -24,6 +24,9 @@
     },
     {
       "path": "../../packages/react"
+    },
+    {
+      "path": "../../packages/react-graph"
     }
   ],
   "include": [

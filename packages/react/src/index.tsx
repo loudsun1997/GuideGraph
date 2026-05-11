@@ -231,6 +231,10 @@ export function useWorkflow(): WorkflowReactState {
   return context;
 }
 
+export function useOptionalWorkflow(): WorkflowReactState | undefined {
+  return useContext(WorkflowContext);
+}
+
 export function useWorkflowActions(): {
   readonly availableActions: readonly AvailableWorkflowAction[];
   readonly sendAction: WorkflowReactState["sendAction"];
