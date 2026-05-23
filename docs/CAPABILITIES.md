@@ -1,8 +1,8 @@
-# FlowForge Capabilities Guide
+# GuideGraph Capabilities Guide
 
-This guide documents what FlowForge supports today, how the pieces fit together, and which features are intentionally not supported yet.
+This guide documents what GuideGraph supports today, how the pieces fit together, and which features are intentionally not supported yet.
 
-FlowForge is currently a developer toolkit for building workflow-driven products. It is not a no-code workflow editor yet. The supported path is:
+GuideGraph is currently a developer toolkit for building workflow-driven products. It now includes an MVP reusable builder, but it is not a complete production no-code workflow studio yet. The supported runtime path is:
 
 ```text
 workflow definition
@@ -19,19 +19,23 @@ The most important rule is that applications should not mutate workflow state di
 ## Package Map
 
 ```text
-@flowforge/core
-@flowforge/server
-@flowforge/http
-@flowforge/graph
-@flowforge/storage-memory
-@flowforge/react
-@flowforge/storage-postgres
-@flowforge/react-graph
-@flowforge/devtools
+@guidegraph/core
+@guidegraph/server
+@guidegraph/http
+@guidegraph/graph
+@guidegraph/builder
+@guidegraph/mcp
+@guidegraph/storage-memory
+@guidegraph/react
+@guidegraph/storage-postgres
+@guidegraph/react-graph
+@guidegraph/react-builder
+@guidegraph/devtools
 examples/permit-app
+examples/builder-app
 ```
 
-### `@flowforge/core`
+### `@guidegraph/core`
 
 Owns workflow definitions and the workflow engine.
 
@@ -46,10 +50,12 @@ Use this package when you need to:
 - calculate available actions
 - generate workflow history entries
 - increment workflow revisions
+- carry workflow context and artifact references
+- define step metadata, assignments, timers, human-task input schemas, effects, compensation, and migration metadata
 
 The core package is pure TypeScript. It does not import React, storage, HTTP, or database code.
 
-### `@flowforge/server`
+### `@guidegraph/server`
 
 Owns runtime orchestration around the core engine.
 
@@ -61,27 +67,265 @@ Use this package when you need to:
 - send events
 - check expected revisions
 - enforce idempotency
+- run app-specific event guards
+- run lifecycle hooks
+- collect outbox-style side effects
 - persist event results through a storage interface
 - retrieve history
 - retrieve available actions from persisted state
 
-The server package does not reimplement workflow logic. It calls `applyWorkflowEvent()` from `@flowforge/core`.
+The server package does not reimplement workflow logic. It calls `applyWorkflowEvent()` from `@guidegraph/core`.
 
-### `@flowforge/http`
+### `@guidegraph/http`
 
-Owns HTTP transport between frontend clients and backend FlowForge runtimes.
+Owns HTTP transport between frontend clients and backend GuideGraph runtimes.
 
 Use this package when you need to:
 
 - create a fetch-based workflow client
-- expose a FlowForge backend over standard Web `Request` and `Response`
+- expose a GuideGraph backend over standard Web `Request` and `Response`
 - keep React transport-agnostic
 - inject actor identity on the server
-- return structured FlowForge error responses
+- return structured GuideGraph error responses
 
 The HTTP package does not import React. React does not import the HTTP package.
 
-### `@flowforge/storage-memory`
+### `@guidegraph/builder`
+
+Provides framework-agnostic builder utilities for workflow definitions.
+
+Use this package when you want to:
+
+- author workflows with a fluent code-first builder API
+- create reusable workflow factories/templates
+- create blank workflow drafts
+- clone runtime definitions into editable builder definitions
+- convert builder definitions back into plain runtime definitions
+- add, update, delete, and rename steps
+- mark start steps
+- create dependency edges
+- create grouped dependency rules for `all`, `any`, and `atLeast` merge gates
+- create transition/action edges
+- keep canvas positions as builder-only metadata
+- keep action label layout/icons as builder-only metadata
+- validate drafts through `@guidegraph/core`
+- generate summaries and warnings
+- run preview simulations through the core engine
+
+Builder-only metadata is stored on `definition.builder`. `builderDefinitionToWorkflowDefinition()` strips this metadata before runtime use.
+
+## Extensibility Model
+
+GuideGraph now supports the main extension points real apps usually need. The important split is:
+
+```text
+GuideGraph owns workflow state and transitions.
+The host app owns domain behavior and external systems.
+```
+
+Supported extension areas:
+
+1. Step metadata
+2. Event/action guards
+3. Lifecycle hooks
+4. Workflow context/data binding
+5. Assignment and ownership
+6. Timers, deadlines, reminders, and escalations
+7. Human task input schemas
+8. Artifacts and file references
+9. External effects/outbox records
+10. Compensation/rollback metadata
+11. Observability/audit metadata
+12. Versioning/migration metadata
+
+### Step Metadata
+
+Attach app-specific display or behavior hints to workflow definitions:
+
+```ts
+step.metadata({
+  kind: "upload",
+  requiredDocuments: ["sitePlan", "proofOfOwnership"]
+});
+```
+
+GuideGraph persists and exposes metadata, but the host app decides how to render or enforce it.
+
+### Event Guards
+
+Guards run before `applyWorkflowEvent()`:
+
+```ts
+const server = createWorkflowServer({
+  storage,
+  guards: [
+    async ({ event }) => {
+      if (event.stepId === "uploadDocuments" && event.payload?.allow !== true) {
+        return "Required uploads are missing.";
+      }
+    }
+  ]
+});
+```
+
+Rejected guards throw stable `GUARD_REJECTED` errors.
+
+### Lifecycle Hooks
+
+Hooks let apps react to workflow changes:
+
+```ts
+createWorkflowServer({
+  storage,
+  hooks: {
+    onInstanceCreated: async ({ instance }) => {},
+    onBeforeEvent: async ({ event }) => {},
+    onStepCompleted: async ({ step }) => [{ type: "notification", target: step?.id }],
+    onStepActivated: async ({ step }) => [{ type: "webhook", target: step?.id }],
+    onWorkflowCompleted: async ({ instance }) => {},
+    onAfterEvent: async ({ result }) => [{ type: "outbox", target: "external-sync" }]
+  }
+});
+```
+
+Hook failures throw stable `HOOK_FAILED` errors.
+
+### Context And Artifacts
+
+Instances can carry app-owned references:
+
+```ts
+await server.createInstance({
+  definition,
+  instanceId: "permit_1",
+  context: { permitId: "permit_123" },
+  artifactIds: ["doc_1"]
+});
+```
+
+Events can patch context and append artifact ids:
+
+```ts
+await server.sendEvent({
+  definition,
+  instanceId: "permit_1",
+  event: {
+    id: "event_1",
+    instanceId: "permit_1",
+    type: "COMPLETE_STEP",
+    stepId: "uploadDocuments",
+    occurredAt: new Date().toISOString(),
+    payload: {
+      context: { uploaded: true }
+    },
+    artifactIds: ["site_plan"]
+  }
+});
+```
+
+### Assignments, Timers, Inputs, Artifacts
+
+Steps can describe who owns work, when it is due, which structured input is expected, and which artifacts are required:
+
+```ts
+step("uploadDocuments", "Upload Documents", (step) =>
+  step
+    .assignment({ role: "applicant" })
+    .timer({ kind: "deadline", after: "P3D" })
+    .input({ required: ["sitePlan"] })
+    .artifact({ id: "sitePlan", kind: "document", required: true })
+);
+```
+
+These fields flow into active step state and available actions.
+
+### Effects And Outbox
+
+Effects are structured side-effect records. GuideGraph collects them, returns them from `sendEvent()`, and memory storage stores them for tests/demos.
+
+```ts
+step.effect({ type: "notification", target: "applicant" });
+transition("review", "approved", {
+  event: "APPROVE",
+  effects: [{ type: "webhook", target: "https://example.test" }]
+});
+```
+
+Production apps should process effects with an outbox worker rather than doing unreliable network calls inline.
+
+### Compensation
+
+Steps and transitions can register compensation metadata:
+
+```ts
+step.compensation({
+  effect: { type: "custom", target: "refund-payment" }
+});
+```
+
+GuideGraph records the compensation effect. The host app decides how and when to execute it.
+
+### Audit Metadata
+
+Events support `metadata` and `payload`; history entries include that data for audit visibility.
+
+### Version Migrations
+
+Workflow definitions can carry migration metadata:
+
+```ts
+migration({
+  fromVersion: "1.0.0",
+  toVersion: "1.1.0",
+  description: "Add inspection step"
+});
+```
+
+GuideGraph validates migration metadata. Automatic live-instance migration is still a future feature.
+
+Example code-first authoring:
+
+```ts
+import { workflow } from "@guidegraph/builder";
+
+const definition = workflow("permit-application", "Permit Application")
+  .version("1.0.0")
+  .start(["fillForm", "uploadDocuments", "payFee"])
+  .step("fillForm", "Fill Form")
+  .step("uploadDocuments", "Upload Documents")
+  .step("payFee", "Pay Fee")
+  .step("submitApplication", "Submit Application", (step) =>
+    step.requiresAll(["fillForm", "uploadDocuments", "payFee"])
+  )
+  .transition("fillForm", "submitApplication")
+  .transition("uploadDocuments", "submitApplication")
+  .transition("payFee", "submitApplication")
+  .build();
+```
+
+### `@guidegraph/mcp`
+
+Provides MCP tools for AI agents and editor integrations.
+
+Use this package when you want an AI agent to:
+
+- validate a `WorkflowDefinition`
+- build a workflow from a compact AI-friendly spec
+- simulate workflow events through the real core engine
+- summarize workflow structure
+
+Available tools:
+
+```text
+guidegraph_validate_workflow
+guidegraph_build_workflow
+guidegraph_simulate_workflow
+guidegraph_summarize_workflow
+```
+
+The MCP package does not import React, HTTP, server, or storage packages.
+
+### `@guidegraph/storage-memory`
 
 Provides an in-memory implementation of the server storage interface.
 
@@ -95,7 +339,7 @@ Use this package for:
 
 It is not meant for production persistence.
 
-### `@flowforge/react`
+### `@guidegraph/react`
 
 Provides React bindings and simple workflow UI components.
 
@@ -113,7 +357,7 @@ Use this package when you want to:
 
 React is optional. Core and server do not depend on React.
 
-### `@flowforge/graph`
+### `@guidegraph/graph`
 
 Provides renderer-agnostic workflow graph data.
 
@@ -128,7 +372,7 @@ Use this package when you want to:
 
 This package does not depend on React, React Flow, or ELK.
 
-### `@flowforge/react-graph`
+### `@guidegraph/react-graph`
 
 Provides the optional drop-in graph renderer for React apps.
 
@@ -139,11 +383,33 @@ Use this package when you want to:
 - use ELK.js for automatic layered layout
 - visualize active, completed, blocked, waiting, failed, skipped, and not-started states
 - inspect selected step details, blockers, dependency progress, outcomes, actions, and history
-- keep graph dependencies out of the base `@flowforge/react` package
+- keep graph dependencies out of the base `@guidegraph/react` package
 
-This package depends on `@flowforge/graph`, `@flowforge/react`, `@xyflow/react`, and `elkjs`. Install it only when you want the built-in graph UI.
+This package depends on `@guidegraph/graph`, `@guidegraph/react`, `@xyflow/react`, and `elkjs`. Install it only when you want the built-in graph UI.
 
-### `@flowforge/storage-postgres`
+### `@guidegraph/react-builder`
+
+Provides the optional React builder UI.
+
+Use this package when you want to render:
+
+- `<WorkflowBuilder />`
+- React Flow canvas editing
+- step cards
+- dependency edges
+- grouped `all`, `any`, and `atLeast` requirement rules
+- transition/action edges
+- action label nodes
+- requirement gate nodes
+- step and edge inspectors
+- validation and warning panels
+- preview/simulation tab
+- generated runtime JSON preview
+- read-only mode for published definitions
+
+This package depends on `@guidegraph/builder`, `@guidegraph/core`, `@xyflow/react`, React, and React DOM. It is optional and should not be imported by core/server/http packages.
+
+### `@guidegraph/storage-postgres`
 
 Provides a Postgres implementation of the server storage interface.
 
@@ -156,7 +422,7 @@ Use this package when you need:
 - transactional event commits
 - data that survives process restarts
 
-### `@flowforge/devtools`
+### `@guidegraph/devtools`
 
 Provides early event recording helpers for workflow debugging tools.
 
@@ -164,7 +430,7 @@ This is not a full visual devtools panel yet.
 
 ### `examples/permit-app`
 
-A Vite React example that demonstrates the current FlowForge runtime end to end.
+A Vite React example that demonstrates the current GuideGraph runtime end to end.
 
 The permit app demonstrates:
 
@@ -182,13 +448,36 @@ The permit app demonstrates:
 - rejection retry loop
 - history
 - revisions
-- React rendering through `@flowforge/react`
+- React rendering through `@guidegraph/react`
 - HTTP client/handler mode through `?transport=http`
-- server/runtime calls through `@flowforge/server`
-- memory persistence through `@flowforge/storage-memory`
+- server/runtime calls through `@guidegraph/server`
+- memory persistence through `@guidegraph/storage-memory`
 - explicit reset behavior through `resetInstance()`
 
 Manual validation steps are documented in [examples/permit-app/MANUAL_TEST.md](../examples/permit-app/MANUAL_TEST.md).
+
+### `examples/builder-app`
+
+A Vite React example dedicated to the workflow builder.
+
+The builder app demonstrates:
+
+- loading the permit template
+- creating a blank draft
+- editing draft workflow structure
+- adding steps
+- editing step metadata
+- editing requirements and actions
+- validating drafts
+- previewing/simulating the draft through core
+- publishing to a plain runtime `WorkflowDefinition`
+- inspecting generated runtime JSON
+
+Run it with:
+
+```sh
+pnpm dev:builder
+```
 
 ## Workflow Definitions
 
@@ -240,7 +529,7 @@ const permitWorkflow = {
 
 ## Workflow Definition Validation
 
-FlowForge validates workflow definitions before creating instances or applying events.
+GuideGraph validates workflow definitions before creating instances or applying events.
 
 Supported validation:
 
@@ -306,11 +595,11 @@ For example, the permit workflow starts with three active steps:
 }
 ```
 
-This is how FlowForge supports concurrent work.
+This is how GuideGraph supports concurrent work.
 
 ## Concurrent Steps
 
-FlowForge supports multiple active steps at the same time.
+GuideGraph supports multiple active steps at the same time.
 
 Example:
 
@@ -378,7 +667,7 @@ Use this for quorum-style workflows.
 
 ## Merge Gates
 
-FlowForge supports merge gates through dependencies.
+GuideGraph supports merge gates through dependencies.
 
 Permit example:
 
@@ -400,7 +689,7 @@ This is framework-owned behavior, not something the React app manually calculate
 
 ## Branching and Divergence
 
-FlowForge supports branching through transition event types.
+GuideGraph supports branching through transition event types.
 
 Example:
 
@@ -437,7 +726,7 @@ Reject
 
 ## Retry Loops
 
-FlowForge supports retry loops as normal forward workflow transitions.
+GuideGraph supports retry loops as normal forward workflow transitions.
 
 Permit rejection example:
 
@@ -525,25 +814,25 @@ The server wraps this with persistence, idempotency, revision checking, and hist
 
 ## HTTP Transport
 
-`@flowforge/http` lets browser clients talk to a backend FlowForge runtime over HTTP.
+`@guidegraph/http` lets browser clients talk to a backend GuideGraph runtime over HTTP.
 
 The intended architecture is:
 
 ```text
 React UI
   -> createHttpWorkflowClient()
-  -> createFlowForgeHttpHandler()
-  -> @flowforge/server
-  -> @flowforge/storage-memory or @flowforge/storage-postgres
+  -> createGuideGraphHttpHandler()
+  -> @guidegraph/server
+  -> @guidegraph/storage-memory or @guidegraph/storage-postgres
 ```
 
 Create a browser client:
 
 ```ts
-import { createHttpWorkflowClient } from "@flowforge/http";
+import { createHttpWorkflowClient } from "@guidegraph/http";
 
 const client = createHttpWorkflowClient({
-  baseUrl: "/api/flowforge",
+  baseUrl: "/api/guidegraph",
   getHeaders: async () => ({
     Authorization: `Bearer ${token}`
   })
@@ -553,15 +842,15 @@ const client = createHttpWorkflowClient({
 Create a backend handler:
 
 ```ts
-import { createFlowForgeHttpHandler } from "@flowforge/http";
-import { createWorkflowServer } from "@flowforge/server";
+import { createGuideGraphHttpHandler } from "@guidegraph/http";
+import { createWorkflowServer } from "@guidegraph/server";
 
 const workflowServer = createWorkflowServer({ storage });
 
-const handler = createFlowForgeHttpHandler({
+const handler = createGuideGraphHttpHandler({
   workflowServer,
   definitions: [permitWorkflow],
-  basePath: "/api/flowforge",
+  basePath: "/api/guidegraph",
   getActorId: async (request) => {
     return "demo_user";
   }
@@ -597,11 +886,11 @@ HTTP errors use this shape:
 }
 ```
 
-The HTTP client throws `FlowForgeHttpError` with `code`, `message`, `status`, and optional `details`.
+The HTTP client throws `GuideGraphHttpError` with `code`, `message`, `status`, and optional `details`.
 
 ## Available Actions
 
-FlowForge can calculate what the user can do next.
+GuideGraph can calculate what the user can do next.
 
 Use:
 
@@ -642,7 +931,7 @@ Reject
 
 ## History
 
-FlowForge supports append-only workflow history.
+GuideGraph supports append-only workflow history.
 
 History entries are generated by the core engine and persisted by the server/storage layer.
 
@@ -744,8 +1033,8 @@ returns cached result instead of failing revision conflict
 Create a server:
 
 ```ts
-import { createWorkflowServer } from "@flowforge/server";
-import { MemoryWorkflowStorage } from "@flowforge/storage-memory";
+import { createWorkflowServer } from "@guidegraph/server";
+import { MemoryWorkflowStorage } from "@guidegraph/storage-memory";
 
 const server = createWorkflowServer({
   storage: new MemoryWorkflowStorage()
@@ -819,7 +1108,7 @@ In memory storage, this is implemented with snapshot/restore behavior.
 
 In Postgres storage, this is implemented with a real database transaction.
 
-`@flowforge/storage-postgres` persists:
+`@guidegraph/storage-postgres` persists:
 
 - workflow instances
 - workflow events
@@ -831,11 +1120,11 @@ The package ships with:
 - `packages/storage-postgres/schema.sql`
 - `packages/storage-postgres/migrations/0001_init.sql`
 - `POSTGRES_WORKFLOW_SCHEMA_SQL`
-- `runFlowForgePostgresMigrations()`
-- `checkFlowForgePostgresSchema()`
+- `runGuideGraphPostgresMigrations()`
+- `checkGuideGraphPostgresSchema()`
 - `storage.checkSchema()`
 
-FlowForge does not silently create Postgres tables by default. Production apps should run migrations explicitly and start storage with `autoMigrate: false`. Local development and tests can opt into `autoMigrate: true`.
+GuideGraph does not silently create Postgres tables by default. Production apps should run migrations explicitly and start storage with `autoMigrate: false`. Local development and tests can opt into `autoMigrate: true`.
 
 ## Error Types
 
@@ -863,7 +1152,7 @@ try {
 }
 ```
 
-`@flowforge/http` adds transport-level error codes:
+`@guidegraph/http` adds transport-level error codes:
 
 ```text
 UNKNOWN_WORKFLOW_DEFINITION
@@ -897,9 +1186,9 @@ INTERNAL_ERROR -> 500
 Wrap your UI with `WorkflowProvider`.
 
 ```tsx
-import { WorkflowProvider } from "@flowforge/react";
-import { createWorkflowServer } from "@flowforge/server";
-import { MemoryWorkflowStorage } from "@flowforge/storage-memory";
+import { WorkflowProvider } from "@guidegraph/react";
+import { createWorkflowServer } from "@guidegraph/server";
+import { MemoryWorkflowStorage } from "@guidegraph/storage-memory";
 
 const client = createWorkflowServer({
   storage: new MemoryWorkflowStorage()
@@ -918,7 +1207,7 @@ const client = createWorkflowServer({
 Use workflow state:
 
 ```tsx
-import { useWorkflow } from "@flowforge/react";
+import { useWorkflow } from "@guidegraph/react";
 
 function DebugPanel() {
   const { instance, resetInstance } = useWorkflow();
@@ -939,7 +1228,7 @@ function DebugPanel() {
 Use available actions:
 
 ```tsx
-import { useWorkflowActions } from "@flowforge/react";
+import { useWorkflowActions } from "@guidegraph/react";
 
 function Actions() {
   const { availableActions, sendAction } = useWorkflowActions();
@@ -964,7 +1253,7 @@ function Actions() {
 Use history:
 
 ```tsx
-import { useWorkflowHistory } from "@flowforge/react";
+import { useWorkflowHistory } from "@guidegraph/react";
 
 function History() {
   const history = useWorkflowHistory();
@@ -981,7 +1270,7 @@ function History() {
 
 ## React Components
 
-`@flowforge/react` includes simple MVP components.
+`@guidegraph/react` includes simple MVP components.
 
 Available components:
 
@@ -999,14 +1288,14 @@ The React package depends on a `WorkflowClient` interface. It does not depend on
 
 ## Graph Packages
 
-FlowForge graph support is split into two layers.
+GuideGraph graph support is split into two layers.
 
 ### Graph Data
 
-Use `@flowforge/graph` when you want renderer-agnostic graph data:
+Use `@guidegraph/graph` when you want renderer-agnostic graph data:
 
 ```ts
-import { buildWorkflowGraph } from "@flowforge/graph";
+import { buildWorkflowGraph } from "@guidegraph/graph";
 
 const graph = buildWorkflowGraph({
   definition: permitWorkflow,
@@ -1027,14 +1316,14 @@ The graph model includes:
 - visited node/edge hints
 - retry loop markers
 
-`@flowforge/graph` does not depend on React, React Flow, or ELK.
+`@guidegraph/graph` does not depend on React, React Flow, or ELK.
 
 ### React Graph UI
 
-Use `@flowforge/react-graph` when you want the built-in graph UI:
+Use `@guidegraph/react-graph` when you want the built-in graph UI:
 
 ```tsx
-import { WorkflowGraph } from "@flowforge/react-graph";
+import { WorkflowGraph } from "@guidegraph/react-graph";
 
 <WorkflowGraph />;
 ```
@@ -1054,7 +1343,124 @@ It currently provides:
 - visited/loop edge styling
 - status and edge legend
 
-The graph renderer is optional. Apps that do not need it can use only `@flowforge/react`, or they can use `@flowforge/graph` with their own renderer.
+The graph renderer is optional. Apps that do not need it can use only `@guidegraph/react`, or they can use `@guidegraph/graph` with their own renderer.
+
+## Builder Packages
+
+GuideGraph builder support is split into a framework-agnostic builder layer and an optional React UI layer.
+
+### Builder Data
+
+Use `@guidegraph/builder` when you want to build or edit workflow definitions as drafts:
+
+```ts
+import {
+  addCanvasStep,
+  applyCanvasDependencyEdge,
+  builderDefinitionToWorkflowDefinition,
+  createBuilderDefinition
+} from "@guidegraph/builder";
+
+let draft = createBuilderDefinition({
+  id: "permit-application",
+  name: "Permit Application",
+  version: "0.1.0"
+});
+
+draft = addCanvasStep(draft, { x: 360, y: 120 }, { name: "Review Application" });
+draft = applyCanvasDependencyEdge(draft, {
+  source: "start",
+  target: "review_application"
+}).definition;
+
+const runtimeDefinition = builderDefinitionToWorkflowDefinition(draft);
+```
+
+`@guidegraph/builder` currently includes:
+
+- `createBuilderDefinition()`
+- `createEmptyWorkflowSkeleton()`
+- `workflowDefinitionToBuilderDefinition()`
+- `builderDefinitionToWorkflowDefinition()`
+- `normalizeBuilderDefinition()`
+- `validateBuilderDefinition()`
+- `assertDraftCanPublish()`
+- `createDefinitionSummary()`
+- `getBuilderWarnings()`
+- `createPreviewSimulation()`
+- `sendPreviewSimulationAction()`
+- `addStep()`
+- `addCanvasStep()`
+- `updateStep()`
+- `setStartStep()`
+- `deleteStep()`
+- `getStepReferences()`
+- `flattenDependencies()`
+- `setDependencies()`
+- `normalizeTransitions()`
+- `toTransitionDrafts()`
+- `definitionToCanvasModel()`
+- `setCanvasNodePosition()`
+- `setCanvasNodePositions()`
+- `setCanvasActionLabelPosition()`
+- `setCanvasActionLabelIcon()`
+- `autoLayoutCanvas()`
+- `autoLayoutDefinition()`
+- `applyCanvasDependencyEdge()`
+- `applyCanvasTransitionEdge()`
+- `deleteCanvasEdge()`
+- `updateCanvasEdge()`
+- `canEditBuilder()`
+- `getDefaultActionIcon()`
+
+The package is intentionally renderer-agnostic. It does not depend on React Flow.
+
+### React Builder UI
+
+Use `@guidegraph/react-builder` when you want a ready-made builder surface:
+
+```tsx
+import { WorkflowBuilder } from "@guidegraph/react-builder";
+
+<WorkflowBuilder
+  initialDefinition={builderDraft}
+  onChange={setBuilderDraft}
+  onPublish={(definition, builderDefinition) => {
+    saveRuntimeDefinition(definition);
+    saveBuilderDraft(builderDefinition);
+  }}
+/>;
+```
+
+`<WorkflowBuilder />` currently supports:
+
+- canvas/form/preview tabs
+- React Flow canvas
+- draggable step nodes
+- requirement gate nodes
+- action label nodes
+- dependency edge creation
+- transition/action edge creation
+- step inspector
+- edge inspector
+- action event/label/icon editing
+- validation errors
+- builder warnings
+- preview simulation with available actions
+- generated runtime JSON preview
+- publish callback with both runtime and builder definitions
+- read-only behavior for non-draft statuses
+
+The builder UI is optional. Apps can use `@guidegraph/builder` and build their own UI if they need a different product experience.
+
+Current builder limitations:
+
+- no bundled backend persistence for definitions
+- no publish approval workflow
+- no role-based builder permissions
+- no domain-specific form schema builder
+- no drag-to-connect test automation beyond component-level behavior
+- no built-in migration system for published definition versions
 
 ## Example App
 
@@ -1095,9 +1501,34 @@ The app also includes a static graph use-case showcase above the live workflow a
 
 The demo uses in-memory storage. Refreshing the page clears the workflow state.
 
+Run the builder app:
+
+```sh
+pnpm dev:builder
+```
+
+The builder app demonstrates:
+
+1. Load the permit workflow template.
+2. Create a blank builder draft.
+3. Add and edit workflow steps.
+4. Create and edit dependency requirements.
+5. Create and edit transition/action outcomes.
+6. Validate the draft.
+7. Preview/simulate actions through the core engine.
+8. Publish a plain runtime `WorkflowDefinition`.
+9. Confirm generated JSON excludes builder-only metadata.
+10. Toggle published/read-only behavior.
+
+Run the builder component workbench:
+
+```sh
+pnpm stories:builder
+```
+
 ## Supported Today
 
-FlowForge currently supports:
+GuideGraph currently supports:
 
 - workflow definition validation
 - workflow instance creation
@@ -1133,6 +1564,14 @@ FlowForge currently supports:
 - graph selected-node inspector
 - graph blocked-reason/outcome/history panels
 - dedicated permit graph use-case showcase
+- framework-agnostic workflow builder utilities
+- optional React workflow builder UI
+- builder draft validation
+- builder preview simulation
+- builder canvas metadata
+- builder action label metadata
+- builder publish-to-runtime conversion
+- builder app example
 - end-to-end permit app example
 
 ## Not Supported Yet
@@ -1146,9 +1585,11 @@ These features are not currently supported:
 - per-step undo
 - per-branch undo
 - compensating actions
-- no-code workflow editor
-- visual graph editor
-- drag-and-drop workflow builder
+- full production no-code workflow studio
+- bundled definition persistence service
+- publish approval workflow
+- builder role/permission model
+- domain form schema designer
 - workflow definition persistence
 - workflow definition version migration
 - role-based permissions
@@ -1164,7 +1605,7 @@ These features are not currently supported:
 
 ## Undo and Redo Clarification
 
-FlowForge does not support undo/redo yet.
+GuideGraph does not support undo/redo yet.
 
 Current history is append-only audit history. It answers:
 
@@ -1279,6 +1720,16 @@ Current tests cover:
 - graph loops and branch edges
 - graph selected-node React Flow mapping
 - graph dependency/loop edge class mapping
+- builder draft creation and normalization
+- builder step editing
+- builder dependency/action edge editing
+- builder canvas metadata
+- builder preview simulation through core
+- builder React component rendering
+- builder React step editing
+- builder React publish behavior
+- builder React preview behavior
+- builder React read-only behavior
 - HTTP create/get/send/history/actions/reset routes
 - HTTP structured error handling
 - HTTP idempotency and revision behavior
@@ -1317,6 +1768,7 @@ Run graph tests:
 
 ```sh
 pnpm test:graph
+pnpm test:builder
 ```
 
 ## Build and Verification
@@ -1346,7 +1798,7 @@ rejection/retry path works
 
 ## Design Principles
 
-FlowForge is currently guided by these rules:
+GuideGraph is currently guided by these rules:
 
 1. Core owns workflow semantics.
 2. Server owns runtime orchestration.

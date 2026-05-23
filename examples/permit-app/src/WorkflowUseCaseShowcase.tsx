@@ -112,7 +112,7 @@ function ConcurrentPanel(): ReactNode {
       }
       side={
         <SidePanel title="Concurrent active steps">
-          <p>FlowForge instances can keep more than one step active at the same time.</p>
+          <p>GuideGraph instances can keep more than one step active at the same time.</p>
           <div className="side-list">
             <SideItem label="Fill Form" meta="Active" status="active" />
             <SideItem label="Upload Documents" meta="Active" status="active" />

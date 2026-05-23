@@ -1,4 +1,4 @@
-import { applyWorkflowEvent, createWorkflowInstance, type WorkflowDefinition, type WorkflowInstance } from "@flowforge/core";
+import { applyWorkflowEvent, createWorkflowInstance, type WorkflowDefinition, type WorkflowInstance } from "@guidegraph/core";
 import { describe, expect, it } from "vitest";
 import { buildWorkflowGraph } from "../src/index.ts";
 

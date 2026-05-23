@@ -1,0 +1,26 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "tsBuildInfoFile": "../../node_modules/.cache/tsbuildinfo/builder-app.tsbuildinfo",
+    "types": [
+      "vite/client"
+    ]
+  },
+  "references": [
+    {
+      "path": "../../packages/core"
+    },
+    {
+      "path": "../../packages/builder"
+    },
+    {
+      "path": "../../packages/react-builder"
+    }
+  ],
+  "include": [
+    "src"
+  ]
+}

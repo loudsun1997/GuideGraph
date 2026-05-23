@@ -1,11 +1,11 @@
-# @flowforge/react-graph
+# @guidegraph/react-graph
 
-Optional React graph renderer for FlowForge.
+Optional React graph renderer for GuideGraph.
 
 This package provides `<WorkflowGraph />`, powered by React Flow for the interactive canvas and ELK.js for automatic layered layout.
 
 ```tsx
-import { WorkflowGraph } from "@flowforge/react-graph";
+import { WorkflowGraph } from "@guidegraph/react-graph";
 
 export function PermitScreen() {
   return <WorkflowGraph />;
@@ -52,4 +52,4 @@ Useful props include:
 />
 ```
 
-This package is intentionally separate from `@flowforge/react` so teams that do not need a built-in graph do not install React Flow or ELK.
+This package is intentionally separate from `@guidegraph/react` so teams that do not need a built-in graph do not install React Flow or ELK.

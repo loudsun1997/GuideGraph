@@ -1,0 +1,363 @@
+.ff-builder {
+  display: grid;
+  gap: 12px;
+  color: #1d2530;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.ff-builder * {
+  box-sizing: border-box;
+}
+
+.ff-builder button,
+.ff-builder input,
+.ff-builder select,
+.ff-builder textarea {
+  font: inherit;
+}
+
+.ff-builder button:not(.react-flow__controls-button) {
+  min-height: 36px;
+  border: 1px solid #23695b;
+  border-radius: 6px;
+  background: #23695b;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 750;
+  padding: 0 12px;
+}
+
+.ff-builder button:not(.react-flow__controls-button):disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.ff-builder button[data-variant="secondary"]:not(.react-flow__controls-button) {
+  border-color: #ccd8de;
+  background: #fff;
+  color: #334155;
+}
+
+.ff-builder button[data-variant="danger"]:not(.react-flow__controls-button) {
+  border-color: #d15a4b;
+  background: #fff4f2;
+  color: #9f2f22;
+}
+
+.ff-builder-header,
+.ff-builder-panel,
+.ff-builder-canvas-card,
+.ff-builder-inspector,
+.ff-builder-json {
+  border: 1px solid #d5e0e5;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.ff-builder-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+}
+
+.ff-builder-header h2,
+.ff-builder-header p {
+  margin: 0;
+}
+
+.ff-builder-header p {
+  margin-top: 4px;
+  color: #647381;
+  font-size: 0.9rem;
+}
+
+.ff-builder-actions,
+.ff-builder-toolbar,
+.ff-builder-tabs,
+.ff-builder-button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ff-builder-summary {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ff-builder-summary-card {
+  border: 1px solid #dfe8ed;
+  border-radius: 8px;
+  background: #fbfcfd;
+  padding: 12px;
+}
+
+.ff-builder-summary-card span,
+.ff-builder-kicker {
+  color: #647381;
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.ff-builder-summary-card strong {
+  display: block;
+  font-size: 1.2rem;
+  margin-top: 4px;
+}
+
+.ff-builder-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 12px;
+}
+
+.ff-builder-canvas-card {
+  overflow: hidden;
+}
+
+.ff-builder-toolbar {
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e4ebef;
+  padding: 12px;
+}
+
+.ff-builder-mode {
+  display: inline-flex;
+  border: 1px solid #ccd8de;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ff-builder-mode button {
+  border: 0;
+  border-radius: 0;
+}
+
+.ff-builder-mode button[aria-pressed="false"] {
+  background: #fff;
+  color: #334155;
+}
+
+.ff-builder-canvas {
+  height: var(--ff-builder-height, 680px);
+}
+
+.ff-builder .react-flow__controls {
+  overflow: hidden;
+  border: 1px solid #d5e0e5;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+}
+
+.ff-builder .react-flow__controls-button {
+  width: 30px;
+  height: 30px;
+  min-height: 0;
+  border: 0;
+  border-bottom: 1px solid #e4ebef;
+  border-radius: 0;
+  background: #fff;
+  color: #334155;
+  cursor: pointer;
+  padding: 6px;
+}
+
+.ff-builder .react-flow__controls-button:hover {
+  background: #f6f9fb;
+}
+
+.ff-builder .react-flow__controls-button svg {
+  max-width: 16px;
+  max-height: 16px;
+}
+
+.ff-builder .react-flow__controls-button:last-child {
+  border-bottom: 0;
+}
+
+.ff-builder .react-flow__attribution {
+  background: rgba(255, 255, 255, 0.8);
+  color: #7b8794;
+  font-size: 0.65rem;
+}
+
+.ff-builder-node {
+  display: grid;
+  gap: 4px;
+  min-width: 170px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+  padding: 12px;
+}
+
+.ff-builder-node[data-start="true"] {
+  border: 2px solid #15916d;
+  background: #f1fbf7;
+}
+
+.ff-builder-node[data-selected="true"] {
+  border-color: #1d4ed8;
+  box-shadow: 0 0 0 4px rgba(29, 78, 216, 0.14), 0 10px 24px rgba(15, 23, 42, 0.12);
+}
+
+.ff-builder-node strong,
+.ff-builder-node span,
+.ff-builder-node small {
+  display: block;
+}
+
+.ff-builder-node span {
+  color: #647381;
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
+.ff-builder-node small {
+  color: #b42318;
+  font-size: 0.74rem;
+  font-weight: 750;
+}
+
+.ff-builder-action-label,
+.ff-builder-gate-node {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+  color: #2563eb;
+  font-size: 0.78rem;
+  font-weight: 850;
+  min-height: 42px;
+  min-width: 120px;
+  padding: 0 14px;
+}
+
+.ff-builder-gate-node {
+  border-color: #7b93a8;
+  border-radius: 8px;
+  color: #536578;
+  min-width: 48px;
+  width: 52px;
+}
+
+.ff-builder-inspector {
+  align-content: start;
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.ff-builder-inspector h3,
+.ff-builder-inspector h4,
+.ff-builder-panel h3,
+.ff-builder-json h3 {
+  margin: 0;
+}
+
+.ff-builder-field {
+  display: grid;
+  gap: 5px;
+}
+
+.ff-builder-field span {
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.ff-builder-field input,
+.ff-builder-field select,
+.ff-builder-field textarea {
+  width: 100%;
+  border: 1px solid #ccd8de;
+  border-radius: 6px;
+  background: #fff;
+  color: #1d2530;
+  min-height: 36px;
+  padding: 7px 9px;
+}
+
+.ff-builder-field textarea {
+  min-height: 74px;
+  resize: vertical;
+}
+
+.ff-builder-checkbox {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.ff-builder-inspector-section {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #e4ebef;
+  border-radius: 8px;
+  background: #fbfcfd;
+  padding: 12px;
+}
+
+.ff-builder-validation {
+  display: grid;
+  gap: 8px;
+}
+
+.ff-builder-validation ul,
+.ff-builder-warning-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.ff-builder-validation[data-valid="true"] {
+  color: #18724f;
+}
+
+.ff-builder-validation[data-valid="false"] {
+  color: #a93427;
+}
+
+.ff-builder-panel,
+.ff-builder-json {
+  padding: 14px;
+}
+
+.ff-builder-json pre {
+  max-height: 340px;
+  overflow: auto;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  padding: 14px;
+}
+
+@media (max-width: 980px) {
+  .ff-builder-layout,
+  .ff-builder-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .ff-builder-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

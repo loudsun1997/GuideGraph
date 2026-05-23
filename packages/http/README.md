@@ -1,33 +1,33 @@
-# @flowforge/http
+# @guidegraph/http
 
-HTTP transport for FlowForge.
+HTTP transport for GuideGraph.
 
-Use this package when a browser or frontend app needs to talk to a backend FlowForge runtime over HTTP:
+Use this package when a browser or frontend app needs to talk to a backend GuideGraph runtime over HTTP:
 
 ```text
 React UI
   -> createHttpWorkflowClient()
-  -> createFlowForgeHttpHandler()
-  -> @flowforge/server
-  -> @flowforge/storage-memory or @flowforge/storage-postgres
+  -> createGuideGraphHttpHandler()
+  -> @guidegraph/server
+  -> @guidegraph/storage-memory or @guidegraph/storage-postgres
 ```
 
-`@flowforge/http` does not depend on React, and `@flowforge/react` does not depend on HTTP. The React package remains transport-agnostic.
+`@guidegraph/http` does not depend on React, and `@guidegraph/react` does not depend on HTTP. The React package remains transport-agnostic.
 
 ## HTTP Client
 
 ```ts
-import { createHttpWorkflowClient } from "@flowforge/http";
+import { createHttpWorkflowClient } from "@guidegraph/http";
 
 const client = createHttpWorkflowClient({
-  baseUrl: "/api/flowforge",
+  baseUrl: "/api/guidegraph",
   getHeaders: async () => ({
     Authorization: `Bearer ${token}`,
   }),
 });
 ```
 
-The returned client structurally satisfies the `WorkflowClient` interface used by `@flowforge/react`:
+The returned client structurally satisfies the `WorkflowClient` interface used by `@guidegraph/react`:
 
 - `createInstance()`
 - `getInstance()`
@@ -41,18 +41,18 @@ The client sends only `workflowId` and `workflowVersion` over HTTP. The server-s
 ## HTTP Handler
 
 ```ts
-import { createFlowForgeHttpHandler } from "@flowforge/http";
-import { createWorkflowServer } from "@flowforge/server";
-import { MemoryWorkflowStorage } from "@flowforge/storage-memory";
+import { createGuideGraphHttpHandler } from "@guidegraph/http";
+import { createWorkflowServer } from "@guidegraph/server";
+import { MemoryWorkflowStorage } from "@guidegraph/storage-memory";
 
 const workflowServer = createWorkflowServer({
   storage: new MemoryWorkflowStorage(),
 });
 
-const handler = createFlowForgeHttpHandler({
+const handler = createGuideGraphHttpHandler({
   workflowServer,
   definitions: [permitWorkflow],
-  basePath: "/api/flowforge",
+  basePath: "/api/guidegraph",
   getActorId: async (request) => {
     return "demo_user";
   },
@@ -102,7 +102,7 @@ Errors return JSON:
 }
 ```
 
-The HTTP client throws `FlowForgeHttpError` with:
+The HTTP client throws `GuideGraphHttpError` with:
 
 - `code`
 - `message`

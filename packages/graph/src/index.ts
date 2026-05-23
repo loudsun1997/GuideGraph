@@ -4,12 +4,12 @@ import type {
   WorkflowInstance,
   WorkflowStepDefinition,
   WorkflowStepState
-} from "@flowforge/core";
+} from "@guidegraph/core";
 
-export type FlowForgeGraphNodeKind = "step";
-export type FlowForgeGraphEdgeKind = "transition" | "dependency";
+export type GuideGraphGraphNodeKind = "step";
+export type GuideGraphGraphEdgeKind = "transition" | "dependency";
 
-export type FlowForgeGraphNodeStatus =
+export type GuideGraphGraphNodeStatus =
   | "active"
   | "completed"
   | "blocked"
@@ -18,7 +18,7 @@ export type FlowForgeGraphNodeStatus =
   | "failed"
   | "not_started";
 
-export type FlowForgeGraphEdgeStatus =
+export type GuideGraphGraphEdgeStatus =
   | "available"
   | "completed"
   | "blocked"
@@ -26,12 +26,12 @@ export type FlowForgeGraphEdgeStatus =
   | "waiting"
   | "inactive";
 
-export interface FlowForgeGraphNode {
+export interface GuideGraphGraphNode {
   readonly id: string;
   readonly stepId: string;
   readonly label: string;
-  readonly kind: FlowForgeGraphNodeKind;
-  readonly status: FlowForgeGraphNodeStatus;
+  readonly kind: GuideGraphGraphNodeKind;
+  readonly status: GuideGraphGraphNodeStatus;
   readonly terminal: boolean;
   readonly active: boolean;
   readonly completed: boolean;
@@ -40,21 +40,21 @@ export interface FlowForgeGraphNode {
   readonly missingStepIds?: readonly string[];
 }
 
-export interface FlowForgeGraphEdge {
+export interface GuideGraphGraphEdge {
   readonly id: string;
   readonly source: string;
   readonly target: string;
-  readonly kind: FlowForgeGraphEdgeKind;
-  readonly status: FlowForgeGraphEdgeStatus;
+  readonly kind: GuideGraphGraphEdgeKind;
+  readonly status: GuideGraphGraphEdgeStatus;
   readonly label?: string;
   readonly eventType?: string;
   readonly loop: boolean;
   readonly visited: boolean;
 }
 
-export interface FlowForgeGraph {
-  readonly nodes: readonly FlowForgeGraphNode[];
-  readonly edges: readonly FlowForgeGraphEdge[];
+export interface GuideGraphGraph {
+  readonly nodes: readonly GuideGraphGraphNode[];
+  readonly edges: readonly GuideGraphGraphEdge[];
 }
 
 export interface BuildWorkflowGraphOptions {
@@ -70,7 +70,7 @@ export interface BuildWorkflowGraphInput {
   readonly options?: BuildWorkflowGraphOptions;
 }
 
-export function buildWorkflowGraph(input: BuildWorkflowGraphInput): FlowForgeGraph {
+export function buildWorkflowGraph(input: BuildWorkflowGraphInput): GuideGraphGraph {
   const options = {
     includeDependencies: true,
     includeTransitions: true,
@@ -83,7 +83,7 @@ export function buildWorkflowGraph(input: BuildWorkflowGraphInput): FlowForgeGra
     buildGraphNode(input.definition, step, input.instance, visitedStepIds)
   );
   const dependencyPairs = getDependencyEdgePairs(input.definition);
-  const edges: FlowForgeGraphEdge[] = [];
+  const edges: GuideGraphGraphEdge[] = [];
 
   if (options.includeTransitions) {
     edges.push(...buildTransitionEdges(input.definition, input.instance, visitedStepIds, dependencyPairs));
@@ -101,7 +101,7 @@ function buildGraphNode(
   step: WorkflowStepDefinition,
   instance: WorkflowInstance | undefined,
   visitedStepIds: ReadonlySet<string>
-): FlowForgeGraphNode {
+): GuideGraphGraphNode {
   const state = instance?.stepStates[step.id];
   const status = getGraphNodeStatus(step, state, instance);
 
@@ -125,7 +125,7 @@ function buildTransitionEdges(
   instance: WorkflowInstance | undefined,
   visitedStepIds: ReadonlySet<string>,
   dependencyPairs: ReadonlySet<string>
-): FlowForgeGraphEdge[] {
+): GuideGraphGraphEdge[] {
   return (definition.transitions ?? []).flatMap((transition) => {
     const eventType = transition.event ?? "COMPLETE_STEP";
 
@@ -153,8 +153,8 @@ function buildDependencyEdges(
   definition: WorkflowDefinition,
   instance: WorkflowInstance | undefined,
   visitedStepIds: ReadonlySet<string>
-): FlowForgeGraphEdge[] {
-  const edges: FlowForgeGraphEdge[] = [];
+): GuideGraphGraphEdge[] {
+  const edges: GuideGraphGraphEdge[] = [];
 
   for (const step of definition.steps) {
     for (const dependency of step.dependencies ?? []) {
@@ -182,7 +182,7 @@ function getGraphNodeStatus(
   step: WorkflowStepDefinition,
   state: WorkflowStepState | undefined,
   instance: WorkflowInstance | undefined
-): FlowForgeGraphNodeStatus {
+): GuideGraphGraphNodeStatus {
   if (instance?.status === "failed" && state?.status !== "completed") {
     return "failed";
   }
@@ -203,7 +203,7 @@ function getTransitionEdgeStatus(
   toStepId: string,
   instance: WorkflowInstance | undefined,
   visited: boolean
-): FlowForgeGraphEdgeStatus {
+): GuideGraphGraphEdgeStatus {
   const fromStatus = instance?.stepStates[fromStepId]?.status;
   const toStatus = instance?.stepStates[toStepId]?.status;
 
@@ -235,7 +235,7 @@ function getDependencyEdgeStatus(
   toStepId: string,
   instance: WorkflowInstance | undefined,
   visited: boolean
-): FlowForgeGraphEdgeStatus {
+): GuideGraphGraphEdgeStatus {
   const fromStatus = instance?.stepStates[fromStepId]?.status;
   const toState = instance?.stepStates[toStepId];
 

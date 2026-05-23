@@ -1,0 +1,51 @@
+{
+  "name": "@guidegraph/builder",
+  "version": "0.1.0-alpha.0",
+  "description": "Framework-agnostic workflow builder state and editing utilities for GuideGraph.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run tests",
+    "typecheck": "tsc -b --pretty false",
+    "clean": "tsc -b --clean"
+  },
+  "dependencies": {
+    "@guidegraph/core": "workspace:*"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/loudsun1997/GuideGraph.git",
+    "directory": "packages/builder"
+  },
+  "bugs": {
+    "url": "https://github.com/loudsun1997/GuideGraph/issues"
+  },
+  "homepage": "https://github.com/loudsun1997/GuideGraph/tree/main/packages/builder#readme",
+  "keywords": [
+    "guidegraph",
+    "workflow",
+    "workflow-engine",
+    "typescript",
+    "builder",
+    "workflow-builder"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false
+}

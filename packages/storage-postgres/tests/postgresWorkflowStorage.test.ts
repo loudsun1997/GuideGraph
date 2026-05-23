@@ -1,13 +1,13 @@
-import { applyWorkflowEvent } from "@flowforge/core";
-import { createWorkflowServer, type CommitWorkflowEventInput, type WorkflowStorage } from "@flowforge/server";
+import { applyWorkflowEvent } from "@guidegraph/core";
+import { createWorkflowServer, type CommitWorkflowEventInput, type WorkflowStorage } from "@guidegraph/server";
 import { newDb } from "pg-mem";
 import { describe, expect, it } from "vitest";
 import {
-  checkFlowForgePostgresSchema,
-  FlowForgePostgresSchemaError,
+  checkGuideGraphPostgresSchema,
+  GuideGraphPostgresSchemaError,
   POSTGRES_WORKFLOW_SCHEMA_SQL,
   PostgresWorkflowStorage,
-  runFlowForgePostgresMigrations,
+  runGuideGraphPostgresMigrations,
   type PostgresConnection,
   type PostgresQueryResult,
   type PostgresQueryable,
@@ -58,16 +58,34 @@ describe("PostgresWorkflowStorage", () => {
 
   it("persists the event log and history log", async () => {
     const { server, storage } = await createTestServer();
+    const definition = {
+      ...permitWorkflow,
+      effects: [
+        {
+          type: "webhook",
+          target: "https://example.test/guidegraph"
+        }
+      ]
+    };
     const createResult = await server.createInstance({
-      definition: permitWorkflow,
+      definition,
       instanceId: "instance_1"
     });
 
     const result = await server.sendEvent({
-      definition: permitWorkflow,
+      definition,
       instanceId: "instance_1",
       event: workflowEvent(createResult.instance, "fillForm", {
-        id: "event_1"
+        id: "event_1",
+        payload: {
+          context: {
+            parcelId: "parcel_1"
+          }
+        },
+        metadata: {
+          source: "postgres_test"
+        },
+        artifactIds: ["artifact_1"]
       })
     });
     const events = await storage.listEvents("instance_1");
@@ -75,10 +93,27 @@ describe("PostgresWorkflowStorage", () => {
 
     expect(events).toHaveLength(1);
     expect(events[0]?.event.id).toBe("event_1");
+    expect(events[0]?.event.payload).toEqual({
+      context: {
+        parcelId: "parcel_1"
+      }
+    });
+    expect(events[0]?.event.metadata).toEqual({
+      source: "postgres_test"
+    });
+    expect(events[0]?.event.artifactIds).toEqual(["artifact_1"]);
+    expect(events[0]?.sideEffects?.map((effect) => effect.type)).toEqual(["webhook"]);
     expect(events[0]?.revisionBefore).toBe(0);
     expect(events[0]?.revisionAfter).toBe(1);
     expect(result.historyEntry.eventId).toBe("event_1");
     expect(history.map((entry) => entry.eventId)).toEqual(["instance_1:created", "event_1"]);
+    expect(history[1]?.metadata).toMatchObject({
+      payload: {
+        context: {
+          parcelId: "parcel_1"
+        }
+      }
+    });
   });
 
   it("returns available actions from persisted state", async () => {
@@ -199,9 +234,9 @@ describe("PostgresWorkflowStorage", () => {
   it("runs migrations and checks the installed schema", async () => {
     const pool = createPostgresPool();
 
-    await runFlowForgePostgresMigrations({ connection: pool });
+    await runGuideGraphPostgresMigrations({ connection: pool });
 
-    const result = await checkFlowForgePostgresSchema({ connection: pool });
+    const result = await checkGuideGraphPostgresSchema({ connection: pool });
     const migrations = await pool.query<{ version: string }>(
       "select version from workflow_schema_migrations order by version"
     );
@@ -217,8 +252,8 @@ describe("PostgresWorkflowStorage", () => {
     const pool = createPostgresPool();
     const storage = new PostgresWorkflowStorage(pool);
 
-    await expect(storage.checkSchema()).rejects.toThrow(FlowForgePostgresSchemaError);
-    await expect(storage.checkSchema()).rejects.toThrow("npx flowforge postgres init");
+    await expect(storage.checkSchema()).rejects.toThrow(GuideGraphPostgresSchemaError);
+    await expect(storage.checkSchema()).rejects.toThrow("npx guidegraph postgres init");
   });
 
   it("auto-migrates only when explicitly enabled", async () => {

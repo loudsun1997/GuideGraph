@@ -1,7 +1,7 @@
 {
-  "name": "@flowforge/storage-memory",
-  "version": "0.1.0",
-  "description": "In-memory workflow storage for FlowForge.",
+  "name": "@guidegraph/storage-memory",
+  "version": "0.1.0-alpha.0",
+  "description": "In-memory workflow storage for GuideGraph.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -20,7 +20,32 @@
     "clean": "tsc -b --clean"
   },
   "dependencies": {
-    "@flowforge/core": "workspace:*",
-    "@flowforge/server": "workspace:*"
-  }
+    "@guidegraph/core": "workspace:*",
+    "@guidegraph/server": "workspace:*"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/loudsun1997/GuideGraph.git",
+    "directory": "packages/storage-memory"
+  },
+  "bugs": {
+    "url": "https://github.com/loudsun1997/GuideGraph/issues"
+  },
+  "homepage": "https://github.com/loudsun1997/GuideGraph/tree/main/packages/storage-memory#readme",
+  "keywords": [
+    "guidegraph",
+    "workflow",
+    "workflow-engine",
+    "typescript",
+    "memory-storage",
+    "testing"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false
 }

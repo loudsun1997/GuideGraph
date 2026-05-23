@@ -13,7 +13,7 @@ import type {
   WorkflowHistoryEntry,
   WorkflowInstance,
   WorkflowStepState
-} from "@flowforge/core";
+} from "@guidegraph/core";
 
 export interface CreateWorkflowInstanceInput {
   readonly definition: WorkflowDefinition;

@@ -9,9 +9,9 @@ import {
   WorkflowStatusList,
   WorkflowTimeline,
   useWorkflow
-} from "@flowforge/react";
-import { WorkflowGraph } from "@flowforge/react-graph";
-import type { WorkflowStepStatus } from "@flowforge/core";
+} from "@guidegraph/react";
+import { WorkflowGraph } from "@guidegraph/react-graph";
+import type { WorkflowStepStatus } from "@guidegraph/core";
 import { permitWorkflow } from "./permitWorkflow.js";
 import { WorkflowUseCaseShowcase } from "./WorkflowUseCaseShowcase.js";
 import { createHttpDemoWorkflowClient, createLocalWorkflowClient } from "./workflowClient.js";
@@ -43,7 +43,7 @@ function PermitWorkflow() {
     <main className="app-shell">
       <header className="app-header">
         <div>
-          <p>FlowForge example</p>
+          <p>GuideGraph example</p>
           <h1>Permit Application</h1>
           <p className="storage-note">
             {getStorageNote()}
@@ -96,10 +96,10 @@ function getTransportMode(): "local" | "http" {
 
 function getStorageNote(): string {
   if (getTransportMode() === "http") {
-    return "HTTP demo mode: React calls createHttpWorkflowClient, which talks to a local FlowForge HTTP handler backed by memory storage.";
+    return "HTTP demo mode: React calls createHttpWorkflowClient, which talks to a local GuideGraph HTTP handler backed by memory storage.";
   }
 
-  return "Local demo mode: React calls the FlowForge server object directly with memory storage. Add ?transport=http to test the HTTP client path.";
+  return "Local demo mode: React calls the GuideGraph server object directly with memory storage. Add ?transport=http to test the HTTP client path.";
 }
 
 function CapabilityMap() {

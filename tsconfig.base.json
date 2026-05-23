@@ -18,31 +18,40 @@
     "noImplicitReturns": true,
     "noUncheckedIndexedAccess": true,
     "paths": {
-      "@flowforge/core": [
+      "@guidegraph/core": [
         "packages/core/src/index.ts"
       ],
-      "@flowforge/devtools": [
+      "@guidegraph/builder": [
+        "packages/builder/src/index.ts"
+      ],
+      "@guidegraph/devtools": [
         "packages/devtools/src/index.ts"
       ],
-      "@flowforge/graph": [
+      "@guidegraph/graph": [
         "packages/graph/src/index.ts"
       ],
-      "@flowforge/http": [
+      "@guidegraph/http": [
         "packages/http/src/index.ts"
       ],
-      "@flowforge/react": [
+      "@guidegraph/mcp": [
+        "packages/mcp/src/index.ts"
+      ],
+      "@guidegraph/react": [
         "packages/react/src/index.tsx"
       ],
-      "@flowforge/react-graph": [
+      "@guidegraph/react-builder": [
+        "packages/react-builder/src/index.tsx"
+      ],
+      "@guidegraph/react-graph": [
         "packages/react-graph/src/index.tsx"
       ],
-      "@flowforge/server": [
+      "@guidegraph/server": [
         "packages/server/src/index.ts"
       ],
-      "@flowforge/storage-memory": [
+      "@guidegraph/storage-memory": [
         "packages/storage-memory/src/index.ts"
       ],
-      "@flowforge/storage-postgres": [
+      "@guidegraph/storage-postgres": [
         "packages/storage-postgres/src/index.ts"
       ]
     },

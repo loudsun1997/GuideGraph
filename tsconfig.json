@@ -5,6 +5,9 @@
       "path": "./packages/core"
     },
     {
+      "path": "./packages/builder"
+    },
+    {
       "path": "./packages/server"
     },
     {
@@ -17,7 +20,13 @@
       "path": "./packages/http"
     },
     {
+      "path": "./packages/mcp"
+    },
+    {
       "path": "./packages/react"
+    },
+    {
+      "path": "./packages/react-builder"
     },
     {
       "path": "./packages/devtools"
@@ -27,6 +36,9 @@
     },
     {
       "path": "./packages/react-graph"
+    },
+    {
+      "path": "./examples/builder-app"
     },
     {
       "path": "./examples/permit-app"

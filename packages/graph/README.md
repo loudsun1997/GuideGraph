@@ -1,11 +1,11 @@
-# @flowforge/graph
+# @guidegraph/graph
 
-Renderer-agnostic graph utilities for FlowForge workflow definitions and instances.
+Renderer-agnostic graph utilities for GuideGraph workflow definitions and instances.
 
 Use this package when you want workflow graph data without adopting a specific UI library.
 
 ```ts
-import { buildWorkflowGraph } from "@flowforge/graph";
+import { buildWorkflowGraph } from "@guidegraph/graph";
 
 const graph = buildWorkflowGraph({
   definition: permitWorkflow,

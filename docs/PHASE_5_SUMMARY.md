@@ -1,15 +1,15 @@
 # Phase 5 Summary: Postgres Storage Adapter
 
-Phase 5 added production-shaped persistence for FlowForge through `@flowforge/storage-postgres`.
+Phase 5 added production-shaped persistence for GuideGraph through `@guidegraph/storage-postgres`.
 
 ## What Was Built
 
-- `PostgresWorkflowStorage`, implementing the `WorkflowStorage` interface from `@flowforge/server`
+- `PostgresWorkflowStorage`, implementing the `WorkflowStorage` interface from `@guidegraph/server`
 - `schema.sql` for simple setup
 - `migrations/0001_init.sql` for versioned setup
 - `workflow_schema_migrations` tracking table
-- `runFlowForgePostgresMigrations()`
-- `checkFlowForgePostgresSchema()`
+- `runGuideGraphPostgresMigrations()`
+- `checkGuideGraphPostgresSchema()`
 - `storage.checkSchema()`
 - explicit `autoMigrate: true` for local development and tests
 - optional real Postgres integration test path
@@ -25,7 +25,7 @@ Phase 5 added production-shaped persistence for FlowForge through `@flowforge/st
 
 ## Production Behavior
 
-FlowForge does not silently create Postgres tables by default.
+GuideGraph does not silently create Postgres tables by default.
 
 Production should use:
 
@@ -38,16 +38,16 @@ const storage = new PostgresWorkflowStorage({
 await storage.checkSchema();
 ```
 
-If tables are missing, FlowForge throws a clear setup error telling the developer to run:
+If tables are missing, GuideGraph throws a clear setup error telling the developer to run:
 
 ```sh
-npx flowforge postgres init
+npx guidegraph postgres init
 ```
 
 or:
 
 ```sh
-psql "$DATABASE_URL" -f node_modules/@flowforge/storage-postgres/schema.sql
+psql "$DATABASE_URL" -f node_modules/@guidegraph/storage-postgres/schema.sql
 ```
 
 ## Local And Test Behavior
@@ -86,9 +86,9 @@ The history table does not yet enforce `event_id` as a foreign key because the i
 
 `workflow_history.event_id` is intentionally not a foreign key in Phase 5.
 
-Reason: FlowForge currently creates an initial `INSTANCE_CREATED` history entry when an instance is created, but it does not yet persist a matching `INSTANCE_CREATED` row in `workflow_events`. Adding a foreign key now would make instance creation fail unless the event model changes too.
+Reason: GuideGraph currently creates an initial `INSTANCE_CREATED` history entry when an instance is created, but it does not yet persist a matching `INSTANCE_CREATED` row in `workflow_events`. Adding a foreign key now would make instance creation fail unless the event model changes too.
 
-Long term, FlowForge should prefer this stricter model:
+Long term, GuideGraph should prefer this stricter model:
 
 ```text
 every workflow_history entry is caused by exactly one workflow_events row
@@ -136,4 +136,4 @@ pnpm typecheck
 pnpm build
 ```
 
-If `pnpm test:postgres:real` is run from Codex, it may need local network permission to connect to `localhost:5432`.
+If `pnpm test:postgres:real` is run from Codex, it may need local network permission to connect to `localhost:5432`. The real Postgres test is intentionally excluded from the default test scripts, so normal test runs do not report a skipped local-database test.

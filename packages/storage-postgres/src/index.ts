@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import type { WorkflowEvent, WorkflowHistoryEntry, WorkflowInstance, WorkflowStepState } from "@flowforge/core";
+import type { WorkflowEvent, WorkflowHistoryEntry, WorkflowInstance, WorkflowStepState } from "@guidegraph/core";
 import {
   WorkflowServerError,
   type CommitWorkflowEventInput,
@@ -7,8 +7,9 @@ import {
   type SendWorkflowEventResult,
   type StoredIdempotencyRecord,
   type StoredWorkflowEvent,
+  type WorkflowSideEffect,
   type WorkflowStorage
-} from "@flowforge/server";
+} from "@guidegraph/server";
 
 export interface PostgresQueryResult<T = unknown> {
   readonly rows: T[];
@@ -44,42 +45,42 @@ export interface PostgresWorkflowStorageConfig {
 
 export type PostgresWorkflowStorageInput = PostgresConnection | PostgresWorkflowStorageConfig;
 
-export interface FlowForgePostgresMigration {
+export interface GuideGraphPostgresMigration {
   readonly version: string;
   readonly sql: string;
 }
 
-export interface FlowForgePostgresSetupOptions {
+export interface GuideGraphPostgresSetupOptions {
   readonly connection?: PostgresConnection;
   readonly connectionString?: string;
   readonly schema?: string;
 }
 
-export interface FlowForgePostgresSchemaCheckResult {
+export interface GuideGraphPostgresSchemaCheckResult {
   readonly ok: boolean;
   readonly missingTables: readonly string[];
 }
 
-export class FlowForgePostgresSchemaError extends Error {
+export class GuideGraphPostgresSchemaError extends Error {
   readonly missingTables: readonly string[];
 
   constructor(missingTables: readonly string[]) {
     super(
-      `FlowForge Postgres schema is not installed.\n\nMissing tables: ${missingTables.join(", ")}.\n\nRun one of:\n\nnpx flowforge postgres init\n\nor:\n\npsql "$DATABASE_URL" -f node_modules/@flowforge/storage-postgres/schema.sql`
+      `GuideGraph Postgres schema is not installed.\n\nMissing tables: ${missingTables.join(", ")}.\n\nRun one of:\n\nnpx guidegraph postgres init\n\nor:\n\npsql "$DATABASE_URL" -f node_modules/@guidegraph/storage-postgres/schema.sql`
     );
-    this.name = "FlowForgePostgresSchemaError";
+    this.name = "GuideGraphPostgresSchemaError";
     this.missingTables = missingTables;
   }
 }
 
-const FLOWFORGE_POSTGRES_SCHEMA_TABLE_SQL = `
+const GUIDEGRAPH_POSTGRES_SCHEMA_TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS workflow_schema_migrations (
   version TEXT PRIMARY KEY,
   applied_at TIMESTAMPTZ NOT NULL
 );
 `;
 
-const FLOWFORGE_POSTGRES_BASE_SCHEMA_SQL = `
+const GUIDEGRAPH_POSTGRES_BASE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS workflow_instances (
   id TEXT PRIMARY KEY,
   workflow_id TEXT NOT NULL,
@@ -144,21 +145,21 @@ CREATE INDEX IF NOT EXISTS workflow_instances_status_updated_at_idx
   ON workflow_instances (status, updated_at DESC, id);
 `;
 
-export const FLOWFORGE_POSTGRES_MIGRATIONS: readonly FlowForgePostgresMigration[] = [
+export const GUIDEGRAPH_POSTGRES_MIGRATIONS: readonly GuideGraphPostgresMigration[] = [
   {
     version: "0001_init",
-    sql: FLOWFORGE_POSTGRES_BASE_SCHEMA_SQL
+    sql: GUIDEGRAPH_POSTGRES_BASE_SCHEMA_SQL
   }
 ];
 
-export const POSTGRES_WORKFLOW_SCHEMA_SQL = `${FLOWFORGE_POSTGRES_SCHEMA_TABLE_SQL}
-${FLOWFORGE_POSTGRES_BASE_SCHEMA_SQL}
+export const POSTGRES_WORKFLOW_SCHEMA_SQL = `${GUIDEGRAPH_POSTGRES_SCHEMA_TABLE_SQL}
+${GUIDEGRAPH_POSTGRES_BASE_SCHEMA_SQL}
 INSERT INTO workflow_schema_migrations (version, applied_at)
 VALUES ('0001_init', now())
 ON CONFLICT (version) DO NOTHING;
 `;
 
-const REQUIRED_FLOWFORGE_POSTGRES_TABLES = [
+const REQUIRED_GUIDEGRAPH_POSTGRES_TABLES = [
   "workflow_schema_migrations",
   "workflow_instances",
   "workflow_events",
@@ -178,7 +179,7 @@ export class PostgresWorkflowStorage implements WorkflowStorage {
     this.#connection = resolveManagedConnection(config);
     this.#ready = config.autoMigrate
       ? this.#connection.then(({ connection }) =>
-          runFlowForgePostgresMigrations({
+          runGuideGraphPostgresMigrations({
             connection,
             schema: this.#schema
           })
@@ -206,8 +207,8 @@ export class PostgresWorkflowStorage implements WorkflowStorage {
   async getInstance(instanceId: string): Promise<WorkflowInstance | undefined> {
     const db = await this.#db();
     const result = await db.query<WorkflowInstanceRow>(
-      `select id, workflow_id, workflow_version, status, active_step_ids, step_states,
-        created_at, updated_at, revision
+    `select id, workflow_id, workflow_version, status, active_step_ids, step_states,
+        context, artifact_ids, metadata, created_at, updated_at, revision
        from workflow_instances
        where id = $1`,
       [instanceId]
@@ -238,7 +239,7 @@ export class PostgresWorkflowStorage implements WorkflowStorage {
   async listEvents(instanceId: string): Promise<StoredWorkflowEvent[]> {
     const db = await this.#db();
     const result = await db.query<WorkflowEventRow>(
-      `select id, instance_id, type, step_id, actor_id, metadata, idempotency_key, occurred_at
+      `select id, instance_id, type, step_id, actor_id, payload, metadata, idempotency_key, occurred_at
        from workflow_events
        where instance_id = $1
        order by occurred_at asc, id asc`,
@@ -251,7 +252,7 @@ export class PostgresWorkflowStorage implements WorkflowStorage {
   async listHistory(instanceId: string): Promise<WorkflowHistoryEntry[]> {
     const db = await this.#db();
     const result = await db.query<WorkflowHistoryRow>(
-      `select id, event_id, instance_id, type, step_id, actor_id, message, occurred_at
+      `select id, event_id, instance_id, type, step_id, actor_id, message, metadata, occurred_at
        from workflow_history
        where instance_id = $1
        order by
@@ -284,9 +285,9 @@ export class PostgresWorkflowStorage implements WorkflowStorage {
     return jsonValue<StoredIdempotencyRecord>(row.result);
   }
 
-  async checkSchema(): Promise<FlowForgePostgresSchemaCheckResult> {
+  async checkSchema(): Promise<GuideGraphPostgresSchemaCheckResult> {
     const db = await this.#db();
-    return checkFlowForgePostgresSchema({
+    return checkGuideGraphPostgresSchema({
       connection: db,
       schema: this.#schema
     });
@@ -302,16 +303,16 @@ export function createPostgresWorkflowStorage(input: PostgresWorkflowStorageInpu
   return new PostgresWorkflowStorage(input);
 }
 
-export async function runFlowForgePostgresMigrations(
-  options: FlowForgePostgresSetupOptions
+export async function runGuideGraphPostgresMigrations(
+  options: GuideGraphPostgresSetupOptions
 ): Promise<void> {
   const managed = await resolveManagedConnection(options);
 
   try {
     await withTransaction(managed.connection, async (client) => {
-      await client.query(FLOWFORGE_POSTGRES_SCHEMA_TABLE_SQL);
+      await client.query(GUIDEGRAPH_POSTGRES_SCHEMA_TABLE_SQL);
 
-      for (const migration of FLOWFORGE_POSTGRES_MIGRATIONS) {
+      for (const migration of GUIDEGRAPH_POSTGRES_MIGRATIONS) {
         const applied = await client.query<{ version: string }>(
           "select version from workflow_schema_migrations where version = $1",
           [migration.version]
@@ -333,9 +334,9 @@ export async function runFlowForgePostgresMigrations(
   }
 }
 
-export async function checkFlowForgePostgresSchema(
-  options: FlowForgePostgresSetupOptions
-): Promise<FlowForgePostgresSchemaCheckResult> {
+export async function checkGuideGraphPostgresSchema(
+  options: GuideGraphPostgresSetupOptions
+): Promise<GuideGraphPostgresSchemaCheckResult> {
   const managed = await resolveManagedConnection(options);
   const schema = options.schema ?? "public";
 
@@ -354,12 +355,12 @@ export async function checkFlowForgePostgresSchema(
       [schema]
     );
     const existingTables = new Set(result.rows.map((row) => row.table_name));
-    const missingTables = REQUIRED_FLOWFORGE_POSTGRES_TABLES.filter(
+    const missingTables = REQUIRED_GUIDEGRAPH_POSTGRES_TABLES.filter(
       (tableName) => !existingTables.has(tableName)
     );
 
     if (missingTables.length > 0) {
-      throw new FlowForgePostgresSchemaError(missingTables);
+      throw new GuideGraphPostgresSchemaError(missingTables);
     }
 
     return {
@@ -397,7 +398,7 @@ function isPostgresConnection(input: PostgresWorkflowStorageInput): input is Pos
 }
 
 async function resolveManagedConnection(
-  options: FlowForgePostgresSetupOptions
+  options: GuideGraphPostgresSetupOptions
 ): Promise<ManagedPostgresConnection> {
   if (options.connection) {
     return { connection: options.connection };
@@ -441,14 +442,17 @@ async function upsertInstance(client: PostgresQueryable, instance: WorkflowInsta
       id, workflow_id, workflow_version, status, active_step_ids, step_states,
       context, artifact_ids, metadata, created_by, created_at, updated_at, revision
     )
-    values ($1, $2, $3, $4, $5::jsonb, $6::jsonb, '{}'::jsonb, '[]'::jsonb, '{}'::jsonb,
-      $7, $8, $9, $10)
+    values ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb,
+      $10, $11, $12, $13)
     on conflict (id) do update set
       workflow_id = excluded.workflow_id,
       workflow_version = excluded.workflow_version,
       status = excluded.status,
       active_step_ids = excluded.active_step_ids,
       step_states = excluded.step_states,
+      context = excluded.context,
+      artifact_ids = excluded.artifact_ids,
+      metadata = excluded.metadata,
       updated_at = excluded.updated_at,
       revision = excluded.revision`,
     [
@@ -458,6 +462,9 @@ async function upsertInstance(client: PostgresQueryable, instance: WorkflowInsta
       instance.status,
       JSON.stringify(instance.activeStepIds),
       JSON.stringify(instance.stepStates),
+      JSON.stringify(instance.context),
+      JSON.stringify(instance.artifactIds),
+      JSON.stringify(instance.metadata),
       instance.history[0]?.actorId ?? null,
       instance.createdAt,
       instance.updatedAt,
@@ -478,9 +485,12 @@ async function updateInstanceForEvent(
       status = $4,
       active_step_ids = $5::jsonb,
       step_states = $6::jsonb,
-      updated_at = $7,
-      revision = $8
-    where id = $1 and revision = $9`,
+      context = $7::jsonb,
+      artifact_ids = $8::jsonb,
+      metadata = $9::jsonb,
+      updated_at = $10,
+      revision = $11
+    where id = $1 and revision = $12`,
     [
       instance.id,
       instance.workflowId,
@@ -488,6 +498,9 @@ async function updateInstanceForEvent(
       instance.status,
       JSON.stringify(instance.activeStepIds),
       JSON.stringify(instance.stepStates),
+      JSON.stringify(instance.context),
+      JSON.stringify(instance.artifactIds),
+      JSON.stringify(instance.metadata),
       instance.updatedAt,
       instance.revision,
       revisionBefore
@@ -505,20 +518,24 @@ async function updateInstanceForEvent(
 async function insertWorkflowEvent(client: PostgresQueryable, storedEvent: StoredWorkflowEvent): Promise<void> {
   const metadata = {
     revisionBefore: storedEvent.revisionBefore,
-    revisionAfter: storedEvent.revisionAfter
+    revisionAfter: storedEvent.revisionAfter,
+    eventMetadata: storedEvent.event.metadata ?? {},
+    eventArtifactIds: storedEvent.event.artifactIds ?? [],
+    sideEffects: storedEvent.sideEffects ?? []
   };
 
   await client.query(
     `insert into workflow_events (
       id, instance_id, type, step_id, actor_id, payload, metadata, idempotency_key, occurred_at
     )
-    values ($1, $2, $3, $4, $5, '{}'::jsonb, $6::jsonb, $7, $8)`,
+    values ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9)`,
     [
       storedEvent.event.id,
       storedEvent.event.instanceId,
       storedEvent.event.type,
       storedEvent.event.stepId ?? null,
       storedEvent.event.actorId ?? null,
+      JSON.stringify(storedEvent.event.payload ?? {}),
       JSON.stringify(metadata),
       storedEvent.idempotencyKey ?? null,
       storedEvent.event.occurredAt
@@ -531,7 +548,7 @@ async function insertHistoryEntry(client: PostgresQueryable, entry: WorkflowHist
     `insert into workflow_history (
       id, event_id, instance_id, type, step_id, actor_id, message, before, after, metadata, occurred_at
     )
-    values ($1, $2, $3, $4, $5, $6, $7, null, null, '{}'::jsonb, $8)`,
+    values ($1, $2, $3, $4, $5, $6, $7, null, null, $8::jsonb, $9)`,
     [
       entry.id,
       entry.eventId,
@@ -540,6 +557,7 @@ async function insertHistoryEntry(client: PostgresQueryable, entry: WorkflowHist
       entry.stepId ?? null,
       entry.actorId ?? null,
       entry.message,
+      JSON.stringify(entry.metadata ?? {}),
       entry.occurredAt
     ]
   );
@@ -579,6 +597,9 @@ function rowToInstance(row: WorkflowInstanceRow, history: WorkflowHistoryEntry[]
     activeStepIds: jsonValue<string[]>(row.active_step_ids),
     stepStates: jsonValue<Record<string, WorkflowStepState>>(row.step_states),
     history,
+    context: jsonValue<Record<string, unknown>>(row.context, {}),
+    artifactIds: jsonValue<string[]>(row.artifact_ids, []),
+    metadata: jsonValue<Record<string, unknown>>(row.metadata, {}),
     createdAt: timestampToIso(row.created_at),
     updatedAt: timestampToIso(row.updated_at)
   };
@@ -587,29 +608,47 @@ function rowToInstance(row: WorkflowInstanceRow, history: WorkflowHistoryEntry[]
 function rowToStoredWorkflowEvent(row: WorkflowEventRow): StoredWorkflowEvent {
   const metadata = jsonValue<WorkflowEventMetadata>(row.metadata, {
     revisionBefore: 0,
-    revisionAfter: 0
+    revisionAfter: 0,
+    eventMetadata: {},
+    eventArtifactIds: [],
+    sideEffects: []
   });
 
   return {
     event: rowToWorkflowEvent(row),
     ...(row.idempotency_key ? { idempotencyKey: row.idempotency_key } : {}),
     revisionBefore: metadata.revisionBefore,
-    revisionAfter: metadata.revisionAfter
+    revisionAfter: metadata.revisionAfter,
+    ...(metadata.sideEffects.length > 0 ? { sideEffects: metadata.sideEffects } : {})
   };
 }
 
 function rowToWorkflowEvent(row: WorkflowEventRow): WorkflowEvent {
+  const metadata = jsonValue<WorkflowEventMetadata>(row.metadata, {
+    revisionBefore: 0,
+    revisionAfter: 0,
+    eventMetadata: {},
+    eventArtifactIds: [],
+    sideEffects: []
+  });
+  const payload = jsonValue<Record<string, unknown>>(row.payload, {});
+
   return {
     id: row.id,
     instanceId: row.instance_id,
     type: row.type,
     ...(row.step_id ? { stepId: row.step_id } : {}),
     ...(row.actor_id ? { actorId: row.actor_id } : {}),
+    ...(Object.keys(payload).length > 0 ? { payload } : {}),
+    ...(Object.keys(metadata.eventMetadata).length > 0 ? { metadata: metadata.eventMetadata } : {}),
+    ...(metadata.eventArtifactIds.length > 0 ? { artifactIds: metadata.eventArtifactIds } : {}),
     occurredAt: timestampToIso(row.occurred_at)
   };
 }
 
 function rowToHistoryEntry(row: WorkflowHistoryRow): WorkflowHistoryEntry {
+  const metadata = jsonValue<Record<string, unknown>>(row.metadata, {});
+
   return {
     id: row.id,
     eventId: row.event_id,
@@ -618,7 +657,8 @@ function rowToHistoryEntry(row: WorkflowHistoryRow): WorkflowHistoryEntry {
     message: row.message,
     occurredAt: timestampToIso(row.occurred_at),
     ...(row.actor_id ? { actorId: row.actor_id } : {}),
-    ...(row.step_id ? { stepId: row.step_id } : {})
+    ...(row.step_id ? { stepId: row.step_id } : {}),
+    ...(Object.keys(metadata).length > 0 ? { metadata } : {})
   };
 }
 
@@ -668,6 +708,9 @@ interface WorkflowInstanceRow {
   readonly status: WorkflowInstance["status"];
   readonly active_step_ids: unknown;
   readonly step_states: unknown;
+  readonly context: unknown;
+  readonly artifact_ids: unknown;
+  readonly metadata: unknown;
   readonly created_at: string | Date;
   readonly updated_at: string | Date;
   readonly revision: number;
@@ -679,6 +722,7 @@ interface WorkflowEventRow {
   readonly type: string;
   readonly step_id: string | null;
   readonly actor_id: string | null;
+  readonly payload: unknown;
   readonly metadata: unknown;
   readonly idempotency_key: string | null;
   readonly occurred_at: string | Date;
@@ -692,12 +736,16 @@ interface WorkflowHistoryRow {
   readonly step_id: string | null;
   readonly actor_id: string | null;
   readonly message: string;
+  readonly metadata: unknown;
   readonly occurred_at: string | Date;
 }
 
 interface WorkflowEventMetadata {
   readonly revisionBefore: number;
   readonly revisionAfter: number;
+  readonly eventMetadata: Record<string, unknown>;
+  readonly eventArtifactIds: readonly string[];
+  readonly sideEffects: readonly WorkflowSideEffect[];
 }
 
 interface IdempotencyRecordRow {

@@ -16,18 +16,18 @@ import ElkConstructor from "elkjs/lib/elk.bundled.js";
 import type { ELK, ElkExtendedEdge, ElkNode } from "elkjs/lib/elk-api.js";
 import {
   buildWorkflowGraph,
-  type FlowForgeGraph,
-  type FlowForgeGraphEdge,
-  type FlowForgeGraphNode
-} from "@flowforge/graph";
-import { useOptionalWorkflow } from "@flowforge/react";
+  type GuideGraphGraph,
+  type GuideGraphGraphEdge,
+  type GuideGraphGraphNode
+} from "@guidegraph/graph";
+import { useOptionalWorkflow } from "@guidegraph/react";
 import type {
   AvailableWorkflowAction,
   WorkflowDefinition,
   WorkflowHistoryEntry,
   WorkflowInstance,
   WorkflowStepDefinition
-} from "@flowforge/core";
+} from "@guidegraph/core";
 
 export interface WorkflowGraphProps {
   readonly definition?: WorkflowDefinition;
@@ -49,9 +49,9 @@ export interface FlowGraphLayoutResult {
 }
 
 export interface WorkflowGraphNodeData extends Record<string, unknown> {
-  readonly graphNode: FlowForgeGraphNode;
+  readonly graphNode: GuideGraphGraphNode;
   readonly label: string;
-  readonly status: FlowForgeGraphNode["status"];
+  readonly status: GuideGraphGraphNode["status"];
   readonly selected: boolean;
   readonly blockedReason?: string;
 }
@@ -60,7 +60,7 @@ const NODE_WIDTH = 190;
 const NODE_HEIGHT = 76;
 const elk = new (ElkConstructor as unknown as { new(): ELK })();
 const nodeTypes = {
-  flowforgeStep: memo(FlowForgeStepNode)
+  guidegraphStep: memo(GuideGraphStepNode)
 };
 
 export function WorkflowGraph(props: WorkflowGraphProps): ReactNode {
@@ -211,7 +211,7 @@ export function WorkflowGraph(props: WorkflowGraphProps): ReactNode {
 }
 
 export async function layoutWorkflowGraph(
-  graph: FlowForgeGraph,
+  graph: GuideGraphGraph,
   options: { readonly direction?: "RIGHT" | "DOWN"; readonly selectedStepId?: string | undefined } = {}
 ): Promise<FlowGraphLayoutResult> {
   const direction = options.direction ?? "RIGHT";
@@ -253,7 +253,7 @@ export async function layoutWorkflowGraph(
 
       return {
         id: node.id,
-        type: "flowforgeStep",
+        type: "guidegraphStep",
         position,
         data: {
           graphNode: node,
@@ -273,7 +273,7 @@ export async function layoutWorkflowGraph(
 }
 
 function createFallbackLayout(
-  graph: FlowForgeGraph,
+  graph: GuideGraphGraph,
   direction: "RIGHT" | "DOWN",
   selectedStepId?: string
 ): FlowGraphLayoutResult {
@@ -283,7 +283,7 @@ function createFallbackLayout(
 
       return {
         id: node.id,
-        type: "flowforgeStep",
+        type: "guidegraphStep",
         position: direction === "RIGHT" ? { x: index * 240, y: 0 } : { x: 0, y: index * 120 },
         data: {
           graphNode: node,
@@ -302,7 +302,7 @@ function createFallbackLayout(
 
 function StepInspectorHeader(props: {
   readonly description: string | undefined;
-  readonly node: FlowForgeGraphNode;
+  readonly node: GuideGraphGraphNode;
   readonly step: WorkflowStepDefinition;
 }): ReactNode {
   return (
@@ -351,7 +351,7 @@ function AvailableActionsPanel(props: {
 function BlockedReasonPanel(props: {
   readonly definition: WorkflowDefinition;
   readonly instance: WorkflowInstance | undefined;
-  readonly node: FlowForgeGraphNode;
+  readonly node: GuideGraphGraphNode;
   readonly step: WorkflowStepDefinition;
 }): ReactNode {
   const dependencyProgress = getDependencyProgress(props.definition, props.instance, props.step);
@@ -389,7 +389,7 @@ function BlockedReasonPanel(props: {
 
 function OutcomePanel(props: {
   readonly definition: WorkflowDefinition;
-  readonly edges: readonly FlowForgeGraphEdge[];
+  readonly edges: readonly GuideGraphGraphEdge[];
 }): ReactNode {
   return (
     <section className="ff-graph-inspector-section">
@@ -458,7 +458,7 @@ function GraphLegend(): ReactNode {
   );
 }
 
-function StatusPill(props: { readonly status: FlowForgeGraphNode["status"] }): ReactNode {
+function StatusPill(props: { readonly status: GuideGraphGraphNode["status"] }): ReactNode {
   return (
     <span className="ff-graph-status-pill" data-status={props.status}>
       {formatStatus(props.status)}
@@ -466,7 +466,7 @@ function StatusPill(props: { readonly status: FlowForgeGraphNode["status"] }): R
   );
 }
 
-function toReactFlowEdge(edge: FlowForgeGraphEdge, selectedStepId?: string): Edge {
+function toReactFlowEdge(edge: GuideGraphGraphEdge, selectedStepId?: string): Edge {
   const style: CSSProperties = {
     stroke: getEdgeColor(edge, selectedStepId),
     strokeWidth: isSelectedEdge(edge, selectedStepId) || edge.status === "available" || edge.status === "completed" ? 2.5 : 1.5
@@ -499,7 +499,7 @@ function toReactFlowEdge(edge: FlowForgeGraphEdge, selectedStepId?: string): Edg
   };
 }
 
-function FlowForgeStepNode(props: NodeProps<Node<WorkflowGraphNodeData>>): ReactNode {
+function GuideGraphStepNode(props: NodeProps<Node<WorkflowGraphNodeData>>): ReactNode {
   const graphNode = props.data.graphNode;
 
   return (
@@ -513,7 +513,7 @@ function FlowForgeStepNode(props: NodeProps<Node<WorkflowGraphNodeData>>): React
   );
 }
 
-function getNodeStyle(node: FlowForgeGraphNode, selected: boolean): CSSProperties {
+function getNodeStyle(node: GuideGraphGraphNode, selected: boolean): CSSProperties {
   const colors = getNodeColors(node.status);
 
   return {
@@ -533,7 +533,7 @@ function getNodeStyle(node: FlowForgeGraphNode, selected: boolean): CSSPropertie
   };
 }
 
-function getNodeColors(status: FlowForgeGraphNode["status"]): { readonly background: string; readonly border: string } {
+function getNodeColors(status: GuideGraphGraphNode["status"]): { readonly background: string; readonly border: string } {
   if (status === "active") {
     return { background: "#eef8f5", border: "#2d7c6f" };
   }
@@ -557,7 +557,7 @@ function getNodeColors(status: FlowForgeGraphNode["status"]): { readonly backgro
   return { background: "#fff", border: "#cad7dd" };
 }
 
-function getEdgeColor(edge: FlowForgeGraphEdge, selectedStepId?: string): string {
+function getEdgeColor(edge: GuideGraphGraphEdge, selectedStepId?: string): string {
   if (isSelectedEdge(edge, selectedStepId)) {
     return "#24384d";
   }
@@ -578,7 +578,7 @@ function getEdgeColor(edge: FlowForgeGraphEdge, selectedStepId?: string): string
 }
 
 function getSelectedStepId(
-  graph: FlowForgeGraph,
+  graph: GuideGraphGraph,
   selectedStepId: string | undefined,
   instance: WorkflowInstance | undefined
 ): string | undefined {
@@ -618,7 +618,7 @@ function getStepName(definition: WorkflowDefinition, stepId: string): string {
   return definition.steps.find((step) => step.id === stepId)?.name ?? stepId;
 }
 
-function isSelectedEdge(edge: FlowForgeGraphEdge, selectedStepId?: string): boolean {
+function isSelectedEdge(edge: GuideGraphGraphEdge, selectedStepId?: string): boolean {
   return Boolean(selectedStepId && (edge.source === selectedStepId || edge.target === selectedStepId));
 }
 

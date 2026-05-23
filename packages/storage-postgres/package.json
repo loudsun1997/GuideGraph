@@ -1,7 +1,7 @@
 {
-  "name": "@flowforge/storage-postgres",
-  "version": "0.1.0",
-  "description": "Postgres workflow storage for FlowForge.",
+  "name": "@guidegraph/storage-postgres",
+  "version": "0.1.0-alpha.0",
+  "description": "Postgres workflow storage for GuideGraph.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -23,8 +23,8 @@
     "clean": "tsc -b --clean"
   },
   "dependencies": {
-    "@flowforge/core": "workspace:*",
-    "@flowforge/server": "workspace:*"
+    "@guidegraph/core": "workspace:*",
+    "@guidegraph/server": "workspace:*"
   },
   "peerDependencies": {
     "pg": ">=8"
@@ -33,5 +33,30 @@
     "pg": {
       "optional": true
     }
-  }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/loudsun1997/GuideGraph.git",
+    "directory": "packages/storage-postgres"
+  },
+  "bugs": {
+    "url": "https://github.com/loudsun1997/GuideGraph/issues"
+  },
+  "homepage": "https://github.com/loudsun1997/GuideGraph/tree/main/packages/storage-postgres#readme",
+  "keywords": [
+    "guidegraph",
+    "workflow",
+    "workflow-engine",
+    "typescript",
+    "postgres",
+    "persistence"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false
 }

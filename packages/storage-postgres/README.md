@@ -1,8 +1,8 @@
-# @flowforge/storage-postgres
+# @guidegraph/storage-postgres
 
-Postgres-backed workflow persistence for FlowForge.
+Postgres-backed workflow persistence for GuideGraph.
 
-This adapter implements the `WorkflowStorage` interface from `@flowforge/server`. It does not run workflow logic itself; the server loads persisted state, calls `@flowforge/core`, then asks this adapter to commit the resulting instance, event, history entry, and optional idempotency result.
+This adapter implements the `WorkflowStorage` interface from `@guidegraph/server`. It does not run workflow logic itself; the server loads persisted state, calls `@guidegraph/core`, then asks this adapter to commit the resulting instance, event, history entry, and optional idempotency result.
 
 ## What It Persists
 
@@ -25,21 +25,21 @@ The package ships with:
 - `schema.sql`
 - `migrations/0001_init.sql`
 - `POSTGRES_WORKFLOW_SCHEMA_SQL`
-- `runFlowForgePostgresMigrations()`
-- `checkFlowForgePostgresSchema()`
+- `runGuideGraphPostgresMigrations()`
+- `checkGuideGraphPostgresSchema()`
 
 For production, apply the schema or run migrations explicitly before starting the app:
 
 ```sh
-psql "$DATABASE_URL" -f node_modules/@flowforge/storage-postgres/schema.sql
+psql "$DATABASE_URL" -f node_modules/@guidegraph/storage-postgres/schema.sql
 ```
 
 Or run migrations from setup/test code:
 
 ```ts
-import { runFlowForgePostgresMigrations } from "@flowforge/storage-postgres";
+import { runGuideGraphPostgresMigrations } from "@guidegraph/storage-postgres";
 
-await runFlowForgePostgresMigrations({
+await runGuideGraphPostgresMigrations({
   connectionString: process.env.DATABASE_URL!,
 });
 ```
@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS workflow_schema_migrations (
 Check the schema at app startup to fail with a useful setup message:
 
 ```ts
-import { PostgresWorkflowStorage } from "@flowforge/storage-postgres";
+import { PostgresWorkflowStorage } from "@guidegraph/storage-postgres";
 
 const storage = new PostgresWorkflowStorage({
   connectionString: process.env.DATABASE_URL!,
@@ -68,18 +68,18 @@ const storage = new PostgresWorkflowStorage({
 await storage.checkSchema();
 ```
 
-If tables are missing, FlowForge throws `FlowForgePostgresSchemaError` with:
+If tables are missing, GuideGraph throws `GuideGraphPostgresSchemaError` with:
 
 ```text
-FlowForge Postgres schema is not installed.
+GuideGraph Postgres schema is not installed.
 
 Run one of:
 
-npx flowforge postgres init
+npx guidegraph postgres init
 
 or:
 
-psql "$DATABASE_URL" -f node_modules/@flowforge/storage-postgres/schema.sql
+psql "$DATABASE_URL" -f node_modules/@guidegraph/storage-postgres/schema.sql
 ```
 
 ## Local Development
@@ -89,7 +89,7 @@ import { Pool } from "pg";
 import {
   POSTGRES_WORKFLOW_SCHEMA_SQL,
   PostgresWorkflowStorage,
-} from "@flowforge/storage-postgres";
+} from "@guidegraph/storage-postgres";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -114,8 +114,8 @@ Do not use `autoMigrate: true` as the production default. Production deployments
 ## Usage With The Server
 
 ```ts
-import { createWorkflowServer } from "@flowforge/server";
-import { PostgresWorkflowStorage } from "@flowforge/storage-postgres";
+import { createWorkflowServer } from "@guidegraph/server";
+import { PostgresWorkflowStorage } from "@guidegraph/storage-postgres";
 
 const storage = new PostgresWorkflowStorage({
   connectionString: process.env.DATABASE_URL!,
@@ -156,6 +156,8 @@ To test against a real local Postgres server, create `.env.local` with `DATABASE
 ```sh
 pnpm test:postgres:real
 ```
+
+The real Postgres test is intentionally excluded from the default test scripts. Normal test runs do not report a skipped local-database test when Postgres is unavailable.
 
 See [REAL_POSTGRES_TESTS.md](./REAL_POSTGRES_TESTS.md) for the local test database setup.
 

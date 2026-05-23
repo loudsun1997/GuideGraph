@@ -1,13 +1,10 @@
 import { existsSync, readFileSync } from "node:fs";
-import { createWorkflowServer } from "@flowforge/server";
+import { createWorkflowServer } from "@guidegraph/server";
 import { describe, expect, it } from "vitest";
 import { PostgresWorkflowStorage } from "../src/index.ts";
 import { permitWorkflow, workflowEvent } from "./fixtures/permitWorkflow.ts";
 
-const describeRealPostgres =
-  process.env.FLOWFORGE_REAL_POSTGRES === "1" ? describe : describe.skip;
-
-describeRealPostgres("PostgresWorkflowStorage against real Postgres", () => {
+describe("PostgresWorkflowStorage against real Postgres", () => {
   it("migrates, writes, and reloads workflow state", async () => {
     const connectionString = getDatabaseUrl();
     const storage = new PostgresWorkflowStorage({
@@ -15,7 +12,7 @@ describeRealPostgres("PostgresWorkflowStorage against real Postgres", () => {
       autoMigrate: true
     });
     const server = createWorkflowServer({ storage });
-    const instanceId = `flowforge_real_${Date.now()}`;
+    const instanceId = `guidegraph_real_${Date.now()}`;
 
     await expect(storage.checkSchema()).resolves.toEqual({
       ok: true,

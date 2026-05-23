@@ -1,7 +1,7 @@
 {
-  "name": "@flowforge/server",
-  "version": "0.1.0",
-  "description": "HTTP server helpers for FlowForge.",
+  "name": "@guidegraph/server",
+  "version": "0.1.0-alpha.0",
+  "description": "HTTP server helpers for GuideGraph.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -21,6 +21,31 @@
     "clean": "tsc -b --clean"
   },
   "dependencies": {
-    "@flowforge/core": "workspace:*"
-  }
+    "@guidegraph/core": "workspace:*"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/loudsun1997/GuideGraph.git",
+    "directory": "packages/server"
+  },
+  "bugs": {
+    "url": "https://github.com/loudsun1997/GuideGraph/issues"
+  },
+  "homepage": "https://github.com/loudsun1997/GuideGraph/tree/main/packages/server#readme",
+  "keywords": [
+    "guidegraph",
+    "workflow",
+    "workflow-engine",
+    "typescript",
+    "runtime",
+    "idempotency"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false
 }

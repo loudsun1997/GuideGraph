@@ -1,4 +1,4 @@
-import type { WorkflowDefinition, WorkflowEvent, WorkflowInstance } from "@flowforge/core";
+import type { WorkflowDefinition, WorkflowEvent, WorkflowInstance } from "@guidegraph/core";
 
 export const permitWorkflow: WorkflowDefinition = {
   id: "permit_application",

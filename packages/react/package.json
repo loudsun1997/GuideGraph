@@ -1,7 +1,7 @@
 {
-  "name": "@flowforge/react",
-  "version": "0.1.0",
-  "description": "React hooks for FlowForge.",
+  "name": "@guidegraph/react",
+  "version": "0.1.0-alpha.0",
+  "description": "React hooks for GuideGraph.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -20,9 +20,34 @@
     "clean": "tsc -b --clean"
   },
   "dependencies": {
-    "@flowforge/core": "workspace:*"
+    "@guidegraph/core": "workspace:*"
   },
   "peerDependencies": {
     "react": ">=18"
-  }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/loudsun1997/GuideGraph.git",
+    "directory": "packages/react"
+  },
+  "bugs": {
+    "url": "https://github.com/loudsun1997/GuideGraph/issues"
+  },
+  "homepage": "https://github.com/loudsun1997/GuideGraph/tree/main/packages/react#readme",
+  "keywords": [
+    "guidegraph",
+    "workflow",
+    "workflow-engine",
+    "typescript",
+    "react",
+    "hooks"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false
 }

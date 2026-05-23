@@ -4,17 +4,21 @@ import {
   getAvailableActions,
   type AvailableWorkflowAction,
   type WorkflowDefinition,
+  type WorkflowEffectDefinition,
   type WorkflowEvent,
   type WorkflowHistoryEntry,
   type WorkflowInstance,
+  type WorkflowStepDefinition,
   type WorkflowStepState
-} from "@flowforge/core";
+} from "@guidegraph/core";
 
 export type WorkflowServerErrorCode =
   | "INSTANCE_NOT_FOUND"
   | "IDEMPOTENCY_CONFLICT"
   | "REVISION_CONFLICT"
+  | "GUARD_REJECTED"
   | "INVALID_EVENT"
+  | "HOOK_FAILED"
   | "STORAGE_ERROR";
 
 export class WorkflowServerError extends Error {
@@ -32,6 +36,7 @@ export interface StoredWorkflowEvent {
   readonly idempotencyKey?: string;
   readonly revisionBefore: number;
   readonly revisionAfter: number;
+  readonly sideEffects?: readonly WorkflowSideEffect[];
 }
 
 export interface StoredIdempotencyRecord {
@@ -48,6 +53,7 @@ export interface CommitWorkflowEventInput {
   readonly instance: WorkflowInstance;
   readonly event: StoredWorkflowEvent;
   readonly historyEntry: WorkflowHistoryEntry;
+  readonly sideEffects?: readonly WorkflowSideEffect[];
   readonly idempotencyKey?: string;
   readonly idempotencyRecord?: StoredIdempotencyRecord;
 }
@@ -57,6 +63,9 @@ export interface CreateWorkflowInstanceInput {
   readonly instanceId: string;
   readonly actorId?: string;
   readonly now?: string;
+  readonly context?: Readonly<Record<string, unknown>>;
+  readonly artifactIds?: readonly string[];
+  readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
 export interface CreateWorkflowInstanceResult {
@@ -77,7 +86,61 @@ export interface SendWorkflowEventResult {
   readonly historyEntry: WorkflowHistoryEntry;
   readonly changedStepIds: readonly string[];
   readonly availableActions: readonly AvailableWorkflowAction[];
+  readonly sideEffects: readonly WorkflowSideEffect[];
   readonly warnings: readonly string[];
+}
+
+export interface WorkflowSideEffect {
+  readonly id: string;
+  readonly instanceId: string;
+  readonly eventId: string;
+  readonly type: string;
+  readonly status: "pending";
+  readonly trigger: string;
+  readonly stepId?: string;
+  readonly target?: string;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+  readonly createdAt: string;
+}
+
+export interface WorkflowGuardContext {
+  readonly definition: WorkflowDefinition;
+  readonly instance: WorkflowInstance;
+  readonly event: WorkflowEvent;
+  readonly step: WorkflowStepDefinition | undefined;
+}
+
+export interface WorkflowLifecycleContext {
+  readonly definition: WorkflowDefinition;
+  readonly previousInstance?: WorkflowInstance;
+  readonly instance: WorkflowInstance;
+  readonly event?: WorkflowEvent;
+  readonly step?: WorkflowStepDefinition;
+  readonly historyEntry?: WorkflowHistoryEntry;
+  readonly result?: SendWorkflowEventResult;
+}
+
+export interface WorkflowGuardDecision {
+  readonly allowed: boolean;
+  readonly message?: string;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+}
+
+export type WorkflowEventGuard = (
+  context: WorkflowGuardContext
+) => boolean | string | WorkflowGuardDecision | void | Promise<boolean | string | WorkflowGuardDecision | void>;
+
+export type WorkflowLifecycleHook = (
+  context: WorkflowLifecycleContext
+) => void | readonly WorkflowEffectDefinition[] | Promise<void | readonly WorkflowEffectDefinition[]>;
+
+export interface WorkflowLifecycleHooks {
+  readonly onInstanceCreated?: WorkflowLifecycleHook;
+  readonly onBeforeEvent?: WorkflowEventGuard;
+  readonly onAfterEvent?: WorkflowLifecycleHook;
+  readonly onStepActivated?: WorkflowLifecycleHook;
+  readonly onStepCompleted?: WorkflowLifecycleHook;
+  readonly onWorkflowCompleted?: WorkflowLifecycleHook;
 }
 
 export interface WorkflowStorage {
@@ -105,17 +168,23 @@ export interface WorkflowServer {
 
 export interface WorkflowServerOptions {
   readonly storage: WorkflowStorage;
+  readonly guards?: readonly WorkflowEventGuard[];
+  readonly hooks?: WorkflowLifecycleHooks;
 }
 
 export function createWorkflowServer(options: WorkflowServerOptions): WorkflowServer {
-  return new DefaultWorkflowServer(options.storage);
+  return new DefaultWorkflowServer(options);
 }
 
 class DefaultWorkflowServer implements WorkflowServer {
   readonly #storage: WorkflowStorage;
+  readonly #guards: readonly WorkflowEventGuard[];
+  readonly #hooks: WorkflowLifecycleHooks;
 
-  constructor(storage: WorkflowStorage) {
-    this.#storage = storage;
+  constructor(options: WorkflowServerOptions) {
+    this.#storage = options.storage;
+    this.#guards = options.guards ?? [];
+    this.#hooks = options.hooks ?? {};
   }
 
   async createInstance(input: CreateWorkflowInstanceInput): Promise<CreateWorkflowInstanceResult> {
@@ -123,12 +192,20 @@ class DefaultWorkflowServer implements WorkflowServer {
       definition: input.definition,
       instanceId: input.instanceId,
       ...(input.actorId ? { actorId: input.actorId } : {}),
-      ...(input.now ? { now: input.now } : {})
+      ...(input.now ? { now: input.now } : {}),
+      ...(input.context ? { context: input.context } : {}),
+      ...(input.artifactIds ? { artifactIds: input.artifactIds } : {}),
+      ...(input.metadata ? { metadata: input.metadata } : {})
     });
 
     await this.#storage.commitInstanceCreation({
       instance,
       historyEntries: instance.history
+    });
+
+    await runLifecycleHook(this.#hooks.onInstanceCreated, {
+      definition: input.definition,
+      instance
     });
 
     return {
@@ -173,19 +250,101 @@ class DefaultWorkflowServer implements WorkflowServer {
     }
 
     try {
+      await this.#runGuards(input.definition, instance, input.event);
       const result = applyWorkflowEvent({
         definition: input.definition,
         instance,
         event: input.event
       });
       const historyEntry = getLatestHistoryEntry(result.instance);
+      const completedStep = getStep(input.definition, result.completedStepId);
+      const sideEffects = [
+        ...collectDefinitionSideEffects({
+          definition: input.definition,
+          previousInstance: instance,
+          instance: result.instance,
+          event: input.event,
+          completedStepId: result.completedStepId,
+          activatedStepIds: result.activatedStepIds,
+          occurredAt: input.event.occurredAt
+        }),
+        ...toSideEffects(
+          input.event,
+          input.event.occurredAt,
+          await runLifecycleHook(this.#hooks.onStepCompleted, {
+            definition: input.definition,
+            previousInstance: instance,
+            instance: result.instance,
+            event: input.event,
+            ...(completedStep ? { step: completedStep } : {}),
+            historyEntry
+          }),
+          "hook:onStepCompleted",
+          result.completedStepId
+        )
+      ];
+
+      for (const activatedStepId of result.activatedStepIds) {
+        const activatedStep = getStep(input.definition, activatedStepId);
+        sideEffects.push(
+          ...toSideEffects(
+            input.event,
+            input.event.occurredAt,
+            await runLifecycleHook(this.#hooks.onStepActivated, {
+              definition: input.definition,
+              previousInstance: instance,
+              instance: result.instance,
+              event: input.event,
+              ...(activatedStep ? { step: activatedStep } : {}),
+              historyEntry
+            }),
+            "hook:onStepActivated",
+            activatedStepId
+          )
+        );
+      }
+
+      if (result.instance.status === "completed" && instance.status !== "completed") {
+        sideEffects.push(
+          ...toSideEffects(
+            input.event,
+            input.event.occurredAt,
+            await runLifecycleHook(this.#hooks.onWorkflowCompleted, {
+              definition: input.definition,
+              previousInstance: instance,
+              instance: result.instance,
+              event: input.event,
+              historyEntry
+            }),
+            "hook:onWorkflowCompleted"
+          )
+        );
+      }
+
       const sendResult: SendWorkflowEventResult = {
         instance: result.instance,
         historyEntry,
         changedStepIds: getChangedStepIds(instance, result.instance),
         availableActions: result.availableActions,
+        sideEffects,
         warnings: []
       };
+
+      sideEffects.push(
+        ...toSideEffects(
+          input.event,
+          input.event.occurredAt,
+          await runLifecycleHook(this.#hooks.onAfterEvent, {
+            definition: input.definition,
+            previousInstance: instance,
+            instance: result.instance,
+            event: input.event,
+            historyEntry,
+            result: sendResult
+          }),
+          "hook:onAfterEvent"
+        )
+      );
 
       await this.#storage.commitEvent({
         instance: result.instance,
@@ -193,9 +352,11 @@ class DefaultWorkflowServer implements WorkflowServer {
           event: input.event,
           ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
           revisionBefore: instance.revision,
-          revisionAfter: result.instance.revision
+          revisionAfter: result.instance.revision,
+          ...(sideEffects.length ? { sideEffects } : {})
         },
         historyEntry,
+        ...(sideEffects.length ? { sideEffects } : {}),
         ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
         ...(input.idempotencyKey
           ? {
@@ -217,6 +378,18 @@ class DefaultWorkflowServer implements WorkflowServer {
         "INVALID_EVENT",
         error instanceof Error ? error.message : "Invalid workflow event."
       );
+    }
+  }
+
+  async #runGuards(definition: WorkflowDefinition, instance: WorkflowInstance, event: WorkflowEvent): Promise<void> {
+    const step = event.stepId ? getStep(definition, event.stepId) : undefined;
+    const guards = [this.#hooks.onBeforeEvent, ...this.#guards].filter(Boolean) as WorkflowEventGuard[];
+
+    for (const guard of guards) {
+      const decision = normalizeGuardDecision(await guard({ definition, instance, event, step }));
+      if (!decision.allowed) {
+        throw new WorkflowServerError("GUARD_REJECTED", decision.message ?? "Workflow event was rejected by a guard.");
+      }
     }
   }
 
@@ -285,4 +458,132 @@ function areStepStatesEqual(
     previous?.blockedReason === next?.blockedReason &&
     JSON.stringify(previous?.missingStepIds ?? []) === JSON.stringify(next?.missingStepIds ?? [])
   );
+}
+
+function normalizeGuardDecision(
+  decision: boolean | string | WorkflowGuardDecision | void
+): WorkflowGuardDecision {
+  if (decision === undefined || decision === true) {
+    return { allowed: true };
+  }
+
+  if (decision === false) {
+    return { allowed: false };
+  }
+
+  if (typeof decision === "string") {
+    return { allowed: false, message: decision };
+  }
+
+  return decision;
+}
+
+async function runLifecycleHook(
+  hook: WorkflowLifecycleHook | undefined,
+  context: WorkflowLifecycleContext
+): Promise<readonly WorkflowEffectDefinition[]> {
+  if (!hook) {
+    return [];
+  }
+
+  try {
+    return (await hook(context)) ?? [];
+  } catch (error) {
+    throw new WorkflowServerError(
+      "HOOK_FAILED",
+      error instanceof Error ? error.message : "Workflow lifecycle hook failed."
+    );
+  }
+}
+
+function collectDefinitionSideEffects(input: {
+  readonly definition: WorkflowDefinition;
+  readonly previousInstance: WorkflowInstance;
+  readonly instance: WorkflowInstance;
+  readonly event: WorkflowEvent;
+  readonly completedStepId: string;
+  readonly activatedStepIds: readonly string[];
+  readonly occurredAt: string;
+}): WorkflowSideEffect[] {
+  const effects: WorkflowSideEffect[] = [];
+  const completedStep = getStep(input.definition, input.completedStepId);
+
+  effects.push(
+    ...toSideEffects(input.event, input.occurredAt, input.definition.effects, "definition:event_applied"),
+    ...toSideEffects(input.event, input.occurredAt, completedStep?.effects, "step:completed", input.completedStepId)
+  );
+
+  for (const activatedStepId of input.activatedStepIds) {
+    const activatedStep = getStep(input.definition, activatedStepId);
+    effects.push(...toSideEffects(input.event, input.occurredAt, activatedStep?.effects, "step:activated", activatedStepId));
+  }
+
+  const matchingTransitions = (input.definition.transitions ?? []).filter(
+    (transition) =>
+      transition.from === input.completedStepId &&
+      (transition.event ?? "COMPLETE_STEP") === input.event.type
+  );
+
+  for (const transition of matchingTransitions) {
+    effects.push(...toSideEffects(input.event, input.occurredAt, transition.effects, "transition:event_applied", transition.to));
+
+    if (transition.compensation?.effect) {
+      effects.push(
+        ...toSideEffects(
+          input.event,
+          input.occurredAt,
+          [transition.compensation.effect],
+          "transition:compensation_registered",
+          transition.to
+        )
+      );
+    }
+  }
+
+  if (input.instance.status === "completed" && input.previousInstance.status !== "completed") {
+    effects.push(...toSideEffects(input.event, input.occurredAt, input.definition.effects, "definition:workflow_completed"));
+  }
+
+  if (completedStep?.compensation?.effect) {
+    effects.push(
+      ...toSideEffects(
+        input.event,
+        input.occurredAt,
+        [completedStep.compensation.effect],
+        "step:compensation_registered",
+        input.completedStepId
+      )
+    );
+  }
+
+  return dedupeSideEffects(effects);
+}
+
+function toSideEffects(
+  event: WorkflowEvent,
+  createdAt: string,
+  effects: readonly WorkflowEffectDefinition[] | undefined,
+  trigger: string,
+  stepId?: string
+): WorkflowSideEffect[] {
+  return (effects ?? []).map((effect, index) => ({
+    id: `${event.id}:${trigger}:${effect.id ?? effect.type}:${index}`,
+    instanceId: event.instanceId,
+    eventId: event.id,
+    type: effect.type,
+    status: "pending",
+    trigger: effect.trigger ?? trigger,
+    ...(stepId ? { stepId } : {}),
+    ...(effect.target ? { target: effect.target } : {}),
+    ...(effect.metadata ? { metadata: effect.metadata } : {}),
+    createdAt
+  }));
+}
+
+function dedupeSideEffects(effects: readonly WorkflowSideEffect[]): WorkflowSideEffect[] {
+  return [...new Map(effects.map((effect) => [effect.id, effect])).values()];
+}
+
+function getStep(definition: WorkflowDefinition, stepId: string): WorkflowStepDefinition | undefined {
+  return definition.steps.find((step) => step.id === stepId);
 }

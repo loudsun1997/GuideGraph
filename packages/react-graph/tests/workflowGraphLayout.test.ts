@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { FlowForgeGraph } from "@flowforge/graph";
+import type { GuideGraphGraph } from "@guidegraph/graph";
 import { layoutWorkflowGraph } from "../src/index.tsx";
 
 describe("layoutWorkflowGraph", () => {
@@ -30,7 +30,7 @@ describe("layoutWorkflowGraph", () => {
   });
 });
 
-const graphFixture: FlowForgeGraph = {
+const graphFixture: GuideGraphGraph = {
   nodes: [
     {
       id: "draft",

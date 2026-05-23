@@ -1,7 +1,7 @@
 {
-  "name": "@flowforge/react-graph",
-  "version": "0.1.0",
-  "description": "Optional React Flow graph renderer for FlowForge.",
+  "name": "@guidegraph/react-graph",
+  "version": "0.1.0-alpha.0",
+  "description": "Optional React Flow graph renderer for GuideGraph.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -21,13 +21,39 @@
     "clean": "tsc -b --clean"
   },
   "dependencies": {
-    "@flowforge/graph": "workspace:*",
-    "@flowforge/react": "workspace:*",
+    "@guidegraph/graph": "workspace:*",
+    "@guidegraph/react": "workspace:*",
     "@xyflow/react": "^12.10.2",
     "elkjs": "^0.11.1"
   },
   "peerDependencies": {
     "react": ">=18",
     "react-dom": ">=18"
-  }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/loudsun1997/GuideGraph.git",
+    "directory": "packages/react-graph"
+  },
+  "bugs": {
+    "url": "https://github.com/loudsun1997/GuideGraph/issues"
+  },
+  "homepage": "https://github.com/loudsun1997/GuideGraph/tree/main/packages/react-graph#readme",
+  "keywords": [
+    "guidegraph",
+    "workflow",
+    "workflow-engine",
+    "typescript",
+    "react-flow",
+    "graph",
+    "visualization"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false
 }

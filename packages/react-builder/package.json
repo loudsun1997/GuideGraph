@@ -1,0 +1,66 @@
+{
+  "name": "@guidegraph/react-builder",
+  "version": "0.1.0-alpha.0",
+  "description": "Reusable React workflow builder UI for GuideGraph.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./styles.css": "./dist/styles.css"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b && cp src/styles.css dist/styles.css",
+    "stories": "ladle serve stories --host 127.0.0.1",
+    "stories:build": "ladle build stories",
+    "test": "vitest run tests",
+    "typecheck": "tsc -b --pretty false",
+    "clean": "tsc -b --clean"
+  },
+  "dependencies": {
+    "@guidegraph/builder": "workspace:*",
+    "@guidegraph/core": "workspace:*",
+    "@xyflow/react": "^12.10.2"
+  },
+  "devDependencies": {
+    "@ladle/react": "^5.0.0"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/loudsun1997/GuideGraph.git",
+    "directory": "packages/react-builder"
+  },
+  "bugs": {
+    "url": "https://github.com/loudsun1997/GuideGraph/issues"
+  },
+  "homepage": "https://github.com/loudsun1997/GuideGraph/tree/main/packages/react-builder#readme",
+  "keywords": [
+    "guidegraph",
+    "workflow",
+    "workflow-engine",
+    "typescript",
+    "react",
+    "builder",
+    "workflow-builder"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": [
+    "./dist/styles.css"
+  ]
+}

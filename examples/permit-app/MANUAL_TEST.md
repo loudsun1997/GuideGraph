@@ -1,8 +1,8 @@
 # Permit App Manual Test Plan
 
-Use this checklist to validate the full FlowForge integration in the browser.
+Use this checklist to validate the full GuideGraph integration in the browser.
 
-The permit app is intentionally simple. It is meant to prove that a frontend can use FlowForge without mutating workflow state directly.
+The permit app is intentionally simple. It is meant to prove that a frontend can use GuideGraph without mutating workflow state directly.
 
 ## Setup
 
@@ -28,7 +28,7 @@ Expected initial page:
 
 ## Graph Use-Case Showcase
 
-The showcase is intentionally static. It demonstrates FlowForge graph behavior even before the live workflow reaches those exact states.
+The showcase is intentionally static. It demonstrates GuideGraph graph behavior even before the live workflow reaches those exact states.
 
 1. Click `Concurrent`.
 

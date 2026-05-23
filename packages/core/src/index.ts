@@ -2,6 +2,7 @@ export type WorkflowId = string;
 export type WorkflowInstanceStatus = "active" | "completed" | "failed";
 export type WorkflowStepStatus = "not_started" | "blocked" | "active" | "completed";
 export type WorkflowEventType = "COMPLETE_STEP" | string;
+export type WorkflowData = Readonly<Record<string, unknown>>;
 
 export interface WorkflowContext<TInput = unknown> {
   readonly input: TInput;
@@ -12,6 +13,57 @@ export interface RunnableWorkflowStep<TInput = unknown, TResult = unknown> {
   readonly id: string;
   readonly name?: string;
   readonly run: (context: WorkflowContext<TInput>) => TResult | Promise<TResult>;
+}
+
+export interface WorkflowAssignmentDefinition {
+  readonly actorId?: string;
+  readonly role?: string;
+  readonly strategy?: "single" | "pool" | "round_robin" | string;
+  readonly metadata?: WorkflowData;
+}
+
+export interface WorkflowTimerDefinition {
+  readonly id?: string;
+  readonly kind: "deadline" | "reminder" | "escalation" | string;
+  readonly after?: string;
+  readonly at?: string;
+  readonly event?: WorkflowEventType;
+  readonly metadata?: WorkflowData;
+}
+
+export interface WorkflowInputDefinition {
+  readonly schema?: WorkflowData;
+  readonly required?: readonly string[];
+  readonly metadata?: WorkflowData;
+}
+
+export interface WorkflowArtifactDefinition {
+  readonly id: string;
+  readonly name?: string;
+  readonly kind?: "file" | "image" | "document" | "url" | string;
+  readonly required?: boolean;
+  readonly metadata?: WorkflowData;
+}
+
+export interface WorkflowEffectDefinition {
+  readonly id?: string;
+  readonly type: "webhook" | "custom" | "notification" | "outbox" | string;
+  readonly trigger?: "step_activated" | "step_completed" | "workflow_completed" | "event_applied" | string;
+  readonly target?: string;
+  readonly metadata?: WorkflowData;
+}
+
+export interface WorkflowCompensationDefinition {
+  readonly event?: WorkflowEventType;
+  readonly effect?: WorkflowEffectDefinition;
+  readonly metadata?: WorkflowData;
+}
+
+export interface WorkflowVersionMigrationDefinition {
+  readonly fromVersion: string;
+  readonly toVersion: string;
+  readonly description?: string;
+  readonly metadata?: WorkflowData;
 }
 
 export type WorkflowDependencyRule =
@@ -33,6 +85,13 @@ export interface WorkflowStepDefinition {
   readonly id: string;
   readonly name: string;
   readonly dependencies?: readonly WorkflowDependencyRule[];
+  readonly metadata?: WorkflowData;
+  readonly assignment?: WorkflowAssignmentDefinition;
+  readonly timers?: readonly WorkflowTimerDefinition[];
+  readonly input?: WorkflowInputDefinition;
+  readonly artifacts?: readonly WorkflowArtifactDefinition[];
+  readonly effects?: readonly WorkflowEffectDefinition[];
+  readonly compensation?: WorkflowCompensationDefinition;
 }
 
 export interface WorkflowTransition {
@@ -40,6 +99,9 @@ export interface WorkflowTransition {
   readonly to: string;
   readonly event?: WorkflowEventType;
   readonly label?: string;
+  readonly metadata?: WorkflowData;
+  readonly effects?: readonly WorkflowEffectDefinition[];
+  readonly compensation?: WorkflowCompensationDefinition;
 }
 
 export interface WorkflowDefinition {
@@ -49,6 +111,10 @@ export interface WorkflowDefinition {
   readonly startStepIds: readonly string[];
   readonly steps: readonly WorkflowStepDefinition[];
   readonly transitions?: readonly WorkflowTransition[];
+  readonly metadata?: WorkflowData;
+  readonly contextSchema?: WorkflowData;
+  readonly effects?: readonly WorkflowEffectDefinition[];
+  readonly migrations?: readonly WorkflowVersionMigrationDefinition[];
 }
 
 export interface WorkflowRunResult {
@@ -70,6 +136,11 @@ export interface WorkflowStepState {
   readonly completedAt?: string;
   readonly blockedReason?: string;
   readonly missingStepIds?: readonly string[];
+  readonly assignment?: WorkflowAssignmentDefinition;
+  readonly timers?: readonly WorkflowTimerDefinition[];
+  readonly input?: WorkflowInputDefinition;
+  readonly artifacts?: readonly WorkflowArtifactDefinition[];
+  readonly metadata?: WorkflowData;
 }
 
 export interface WorkflowHistoryEntry {
@@ -81,6 +152,7 @@ export interface WorkflowHistoryEntry {
   readonly occurredAt: string;
   readonly actorId?: string;
   readonly stepId?: string;
+  readonly metadata?: WorkflowData;
 }
 
 export interface WorkflowInstance {
@@ -92,6 +164,9 @@ export interface WorkflowInstance {
   readonly activeStepIds: readonly string[];
   readonly stepStates: Readonly<Record<string, WorkflowStepState>>;
   readonly history: readonly WorkflowHistoryEntry[];
+  readonly context: WorkflowData;
+  readonly artifactIds: readonly string[];
+  readonly metadata: WorkflowData;
   readonly createdAt: string;
   readonly updatedAt: string;
 }
@@ -103,12 +178,20 @@ export interface WorkflowEvent {
   readonly stepId?: string;
   readonly actorId?: string;
   readonly occurredAt: string;
+  readonly payload?: WorkflowData;
+  readonly metadata?: WorkflowData;
+  readonly artifactIds?: readonly string[];
 }
 
 export interface AvailableWorkflowAction {
   readonly type: WorkflowEventType;
   readonly stepId: string;
   readonly label: string;
+  readonly metadata?: WorkflowData;
+  readonly assignment?: WorkflowAssignmentDefinition;
+  readonly input?: WorkflowInputDefinition;
+  readonly artifacts?: readonly WorkflowArtifactDefinition[];
+  readonly timers?: readonly WorkflowTimerDefinition[];
 }
 
 export interface ValidationResult {
@@ -121,6 +204,9 @@ export interface CreateWorkflowInstanceOptions {
   readonly instanceId: string;
   readonly actorId?: string;
   readonly now?: string;
+  readonly context?: WorkflowData;
+  readonly artifactIds?: readonly string[];
+  readonly metadata?: WorkflowData;
 }
 
 export interface ApplyWorkflowEventOptions {
@@ -132,6 +218,8 @@ export interface ApplyWorkflowEventOptions {
 export interface ApplyWorkflowEventResult {
   readonly instance: WorkflowInstance;
   readonly availableActions: readonly AvailableWorkflowAction[];
+  readonly completedStepId: string;
+  readonly activatedStepIds: readonly string[];
 }
 
 export function createWorkflow(definition: WorkflowDefinition): WorkflowDefinition {
@@ -192,7 +280,12 @@ export function validateWorkflowDefinition(definition: WorkflowDefinition): Vali
     for (const dependency of step.dependencies ?? []) {
       validateDependencyRule(step.id, dependency, stepIds, errors);
     }
+
+    validateStepExtensions(step, errors);
   }
+
+  validateWorkflowEffects("workflow", definition.effects ?? [], errors);
+  validateVersionMigrations(definition, errors);
 
   errors.push(...getCircularDependencyErrors(definition));
 
@@ -218,7 +311,7 @@ export function createWorkflowInstance(options: CreateWorkflowInstanceOptions): 
 
   for (const step of options.definition.steps) {
     if (options.definition.startStepIds.includes(step.id)) {
-      stepStates[step.id] = { status: "active" };
+      stepStates[step.id] = createStepState(step, "active");
       continue;
     }
 
@@ -244,6 +337,9 @@ export function createWorkflowInstance(options: CreateWorkflowInstanceOptions): 
     activeStepIds: [...options.definition.startStepIds],
     stepStates,
     history: [createdHistoryEntry],
+    context: cloneData(options.context ?? {}),
+    artifactIds: [...(options.artifactIds ?? [])],
+    metadata: cloneData(options.metadata ?? {}),
     createdAt: now,
     updatedAt: now
   };
@@ -277,12 +373,15 @@ export function applyWorkflowEvent(options: ApplyWorkflowEventOptions): ApplyWor
     throw new Error(`No transition found for event ${options.event.type} from step ${stepId}.`);
   }
 
+  const previousActiveStepIds = options.instance.activeStepIds;
   let nextInstance = cloneInstanceForUpdate(options.instance, options.event.occurredAt);
   nextInstance.stepStates[stepId] = {
+    ...createStepState(step, "completed"),
     status: "completed",
     completedAt: options.event.occurredAt
   };
   nextInstance.activeStepIds = nextInstance.activeStepIds.filter((id) => id !== stepId);
+  nextInstance = applyEventPayload(nextInstance, options.event);
 
   for (const transition of matchingTransitions) {
     nextInstance = activateTransitionTarget(options.definition, nextInstance, transition.to);
@@ -297,7 +396,9 @@ export function applyWorkflowEvent(options: ApplyWorkflowEventOptions): ApplyWor
 
   return {
     instance: nextInstance,
-    availableActions: getAvailableActions(options.definition, nextInstance)
+    availableActions: getAvailableActions(options.definition, nextInstance),
+    completedStepId: stepId,
+    activatedStepIds: nextInstance.activeStepIds.filter((id) => !previousActiveStepIds.includes(id))
   };
 }
 
@@ -324,7 +425,12 @@ export function getAvailableActions(
         ...branchTransitions.map((transition) => ({
           type: transition.event ?? "COMPLETE_STEP",
           stepId,
-          label: transition.label ?? transition.event ?? `Complete ${step.name}`
+          label: transition.label ?? transition.event ?? `Complete ${step.name}`,
+          ...(transition.metadata ?? step.metadata ? { metadata: { ...(step.metadata ?? {}), ...(transition.metadata ?? {}) } } : {}),
+          ...(step.assignment ? { assignment: step.assignment } : {}),
+          ...(step.input ? { input: step.input } : {}),
+          ...(step.artifacts ? { artifacts: step.artifacts } : {}),
+          ...(step.timers ? { timers: step.timers } : {})
         }))
       );
       continue;
@@ -333,7 +439,12 @@ export function getAvailableActions(
     actions.push({
       type: "COMPLETE_STEP",
       stepId,
-      label: `Complete ${step.name}`
+      label: `Complete ${step.name}`,
+      ...(step.metadata ? { metadata: step.metadata } : {}),
+      ...(step.assignment ? { assignment: step.assignment } : {}),
+      ...(step.input ? { input: step.input } : {}),
+      ...(step.artifacts ? { artifacts: step.artifacts } : {}),
+      ...(step.timers ? { timers: step.timers } : {})
     });
   }
 
@@ -387,6 +498,46 @@ function validateDependencyRule(
 
   if (dependency.type === "atLeast" && (dependency.count < 1 || dependency.count > dependency.stepIds.length)) {
     errors.push(`Dependency on ${stepId} has invalid atLeast count: ${dependency.count}`);
+  }
+}
+
+function validateStepExtensions(step: WorkflowStepDefinition, errors: string[]): void {
+  if (step.assignment && !step.assignment.actorId && !step.assignment.role) {
+    errors.push(`Assignment for ${step.id} must include an actorId or role.`);
+  }
+
+  for (const artifact of step.artifacts ?? []) {
+    if (!isNonEmptyString(artifact.id)) {
+      errors.push(`Artifact on ${step.id} must include an id.`);
+    }
+  }
+
+  for (const timer of step.timers ?? []) {
+    if (!timer.after && !timer.at) {
+      errors.push(`Timer on ${step.id} must include after or at.`);
+    }
+  }
+
+  validateWorkflowEffects(step.id, step.effects ?? [], errors);
+}
+
+function validateWorkflowEffects(scope: string, effects: readonly WorkflowEffectDefinition[], errors: string[]): void {
+  for (const effect of effects) {
+    if (!isNonEmptyString(effect.type)) {
+      errors.push(`Effect on ${scope} must include a type.`);
+    }
+  }
+}
+
+function validateVersionMigrations(definition: WorkflowDefinition, errors: string[]): void {
+  for (const migration of definition.migrations ?? []) {
+    if (!isNonEmptyString(migration.fromVersion) || !isNonEmptyString(migration.toVersion)) {
+      errors.push("Workflow migrations must include fromVersion and toVersion.");
+    }
+
+    if (migration.fromVersion === migration.toVersion) {
+      errors.push(`Workflow migration cannot target the same version: ${migration.fromVersion}`);
+    }
   }
 }
 
@@ -459,7 +610,7 @@ function getInitialInactiveStepState(
   stepStates: Readonly<Record<string, WorkflowStepState>>
 ): WorkflowStepState {
   const blocked = getBlockedState(step, stepStates);
-  return blocked ?? { status: "not_started" };
+  return blocked ?? createStepState(step, "not_started");
 }
 
 function activateTransitionTarget(
@@ -475,7 +626,7 @@ function activateTransitionTarget(
     return instance;
   }
 
-  instance.stepStates[stepId] = { status: "active" };
+  instance.stepStates[stepId] = createStepState(step, "active");
 
   if (!instance.activeStepIds.includes(stepId)) {
     instance.activeStepIds = [...instance.activeStepIds, stepId];
@@ -497,7 +648,7 @@ function recalculateBlockedSteps(
       continue;
     }
 
-    next.stepStates[step.id] = getBlockedState(step, next.stepStates) ?? { status: "not_started" };
+    next.stepStates[step.id] = getBlockedState(step, next.stepStates) ?? createStepState(step, "not_started");
   }
 
   return next;
@@ -522,9 +673,21 @@ function getBlockedState(
   }
 
   return {
+    ...createStepState(step, "blocked"),
     status: "blocked",
     blockedReason: `Waiting for ${missingStepIds.join(", ")}.`,
     missingStepIds
+  };
+}
+
+function createStepState(step: WorkflowStepDefinition, status: WorkflowStepStatus): WorkflowStepState {
+  return {
+    status,
+    ...(step.assignment ? { assignment: clonePlain(step.assignment) } : {}),
+    ...(step.timers ? { timers: step.timers.map(clonePlain) } : {}),
+    ...(step.input ? { input: clonePlain(step.input) } : {}),
+    ...(step.artifacts ? { artifacts: step.artifacts.map(clonePlain) } : {}),
+    ...(step.metadata ? { metadata: cloneData(step.metadata) } : {})
   };
 }
 
@@ -609,7 +772,15 @@ function createHistoryEntry(
     message: getHistoryMessage(definition, step, event),
     occurredAt: event.occurredAt,
     ...(event.actorId ? { actorId: event.actorId } : {}),
-    stepId: step.id
+    stepId: step.id,
+    ...(event.metadata ?? event.payload
+      ? {
+          metadata: {
+            ...(event.metadata ?? {}),
+            ...(event.payload ? { payload: event.payload } : {})
+          }
+        }
+      : {})
   };
 }
 
@@ -665,9 +836,51 @@ function cloneMutableInstance(instance: WorkflowInstance | MutableWorkflowInstan
   return {
     ...instance,
     activeStepIds: [...instance.activeStepIds],
-    stepStates: { ...instance.stepStates },
-    history: [...instance.history]
+    stepStates: cloneStepStates(instance.stepStates),
+    history: instance.history.map(clonePlain),
+    context: cloneData(instance.context),
+    artifactIds: [...instance.artifactIds],
+    metadata: cloneData(instance.metadata)
   };
+}
+
+function applyEventPayload(instance: MutableWorkflowInstance, event: WorkflowEvent): MutableWorkflowInstance {
+  const contextPatch = event.payload?.context;
+  const metadataPatch = event.payload?.metadata;
+
+  if (contextPatch && typeof contextPatch === "object" && !Array.isArray(contextPatch)) {
+    instance.context = {
+      ...instance.context,
+      ...(contextPatch as WorkflowData)
+    };
+  }
+
+  if (metadataPatch && typeof metadataPatch === "object" && !Array.isArray(metadataPatch)) {
+    instance.metadata = {
+      ...instance.metadata,
+      ...(metadataPatch as WorkflowData)
+    };
+  }
+
+  if (event.artifactIds?.length) {
+    instance.artifactIds = [...new Set([...instance.artifactIds, ...event.artifactIds])];
+  }
+
+  return instance;
+}
+
+function cloneStepStates(
+  stepStates: Readonly<Record<string, WorkflowStepState>>
+): Record<string, WorkflowStepState> {
+  return Object.fromEntries(Object.entries(stepStates).map(([stepId, state]) => [stepId, clonePlain(state)]));
+}
+
+function cloneData(value: WorkflowData): WorkflowData {
+  return clonePlain(value);
+}
+
+function clonePlain<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 function isNonEmptyString(value: unknown): value is string {

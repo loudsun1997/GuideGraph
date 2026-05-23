@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createWorkflowServer } from "@flowforge/server";
-import { MemoryWorkflowStorage } from "@flowforge/storage-memory";
+import { createWorkflowServer } from "@guidegraph/server";
+import { MemoryWorkflowStorage } from "@guidegraph/storage-memory";
 import { permitWorkflow, workflowEvent } from "./fixtures/permitWorkflow.ts";
 
 describe("createWorkflowServer", () => {

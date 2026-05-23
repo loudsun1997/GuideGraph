@@ -1,7 +1,7 @@
 {
-  "name": "@flowforge/core",
-  "version": "0.1.0",
-  "description": "Core workflow primitives for FlowForge.",
+  "name": "@guidegraph/core",
+  "version": "0.1.0-alpha.0",
+  "description": "Core workflow primitives for GuideGraph.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -19,5 +19,30 @@
     "test": "vitest run tests",
     "typecheck": "tsc -b --pretty false",
     "clean": "tsc -b --clean"
-  }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/loudsun1997/GuideGraph.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/loudsun1997/GuideGraph/issues"
+  },
+  "homepage": "https://github.com/loudsun1997/GuideGraph/tree/main/packages/core#readme",
+  "keywords": [
+    "guidegraph",
+    "workflow",
+    "workflow-engine",
+    "typescript",
+    "state-machine",
+    "workflow-definition"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false
 }

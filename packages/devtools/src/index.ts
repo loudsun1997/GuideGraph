@@ -1,6 +1,6 @@
-import type { WorkflowId } from "@flowforge/core";
+import type { WorkflowId } from "@guidegraph/core";
 
-export type FlowForgeDevtoolEventType =
+export type GuideGraphDevtoolEventType =
   | "workflow:started"
   | "workflow:completed"
   | "workflow:failed"
@@ -8,18 +8,18 @@ export type FlowForgeDevtoolEventType =
   | "step:completed"
   | "step:failed";
 
-export interface FlowForgeDevtoolEvent {
-  readonly type: FlowForgeDevtoolEventType;
+export interface GuideGraphDevtoolEvent {
+  readonly type: GuideGraphDevtoolEventType;
   readonly workflowId: WorkflowId;
   readonly stepId?: string;
   readonly timestamp: number;
   readonly data?: unknown;
 }
 
-export class FlowForgeEventRecorder {
-  readonly #events: FlowForgeDevtoolEvent[] = [];
+export class GuideGraphEventRecorder {
+  readonly #events: GuideGraphDevtoolEvent[] = [];
 
-  record(event: Omit<FlowForgeDevtoolEvent, "timestamp">): FlowForgeDevtoolEvent {
+  record(event: Omit<GuideGraphDevtoolEvent, "timestamp">): GuideGraphDevtoolEvent {
     const nextEvent = {
       ...event,
       timestamp: Date.now()
@@ -29,7 +29,7 @@ export class FlowForgeEventRecorder {
     return nextEvent;
   }
 
-  list(): FlowForgeDevtoolEvent[] {
+  list(): GuideGraphDevtoolEvent[] {
     return [...this.#events];
   }
 

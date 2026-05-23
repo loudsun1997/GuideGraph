@@ -1,17 +1,19 @@
-import type { WorkflowHistoryEntry, WorkflowInstance, WorkflowStepState } from "@flowforge/core";
+import type { WorkflowHistoryEntry, WorkflowInstance, WorkflowStepState } from "@guidegraph/core";
 import type {
   CommitWorkflowEventInput,
   CommitWorkflowInstanceCreationInput,
   SendWorkflowEventResult,
   StoredIdempotencyRecord,
   StoredWorkflowEvent,
+  WorkflowSideEffect,
   WorkflowStorage
-} from "@flowforge/server";
+} from "@guidegraph/server";
 
 export class MemoryWorkflowStorage implements WorkflowStorage {
   readonly #instances = new Map<string, WorkflowInstance>();
   readonly #events = new Map<string, StoredWorkflowEvent[]>();
   readonly #history = new Map<string, WorkflowHistoryEntry[]>();
+  readonly #sideEffects = new Map<string, WorkflowSideEffect[]>();
   readonly #idempotencyRecords = new Map<string, StoredIdempotencyRecord>();
 
   async commitInstanceCreation(input: CommitWorkflowInstanceCreationInput): Promise<void> {
@@ -21,6 +23,7 @@ export class MemoryWorkflowStorage implements WorkflowStorage {
       this.#instances.set(input.instance.id, cloneInstance(input.instance));
       this.#history.set(input.instance.id, input.historyEntries.map(cloneHistoryEntry));
       this.#events.set(input.instance.id, []);
+      this.#sideEffects.set(input.instance.id, []);
       this.#deleteIdempotencyRecordsForInstance(input.instance.id);
     } catch (error) {
       this.#restore(snapshot);
@@ -54,6 +57,13 @@ export class MemoryWorkflowStorage implements WorkflowStorage {
           cloneIdempotencyRecord(input.idempotencyRecord)
         );
       }
+
+      if (input.sideEffects?.length) {
+        this.#sideEffects.set(instanceId, [
+          ...(this.#sideEffects.get(instanceId) ?? []),
+          ...input.sideEffects.map(cloneSideEffect)
+        ]);
+      }
     } catch (error) {
       this.#restore(snapshot);
       throw error;
@@ -66,6 +76,10 @@ export class MemoryWorkflowStorage implements WorkflowStorage {
 
   async listHistory(instanceId: string): Promise<WorkflowHistoryEntry[]> {
     return (this.#history.get(instanceId) ?? []).map(cloneHistoryEntry);
+  }
+
+  async listSideEffects(instanceId: string): Promise<WorkflowSideEffect[]> {
+    return (this.#sideEffects.get(instanceId) ?? []).map(cloneSideEffect);
   }
 
   async getIdempotencyRecord(
@@ -81,6 +95,7 @@ export class MemoryWorkflowStorage implements WorkflowStorage {
       instances: new Map([...this.#instances].map(([key, instance]) => [key, cloneInstance(instance)])),
       events: new Map([...this.#events].map(([key, events]) => [key, events.map(cloneStoredEvent)])),
       history: new Map([...this.#history].map(([key, history]) => [key, history.map(cloneHistoryEntry)])),
+      sideEffects: new Map([...this.#sideEffects].map(([key, effects]) => [key, effects.map(cloneSideEffect)])),
       idempotencyRecords: new Map(
         [...this.#idempotencyRecords].map(([key, record]) => [key, cloneIdempotencyRecord(record)])
       )
@@ -91,6 +106,7 @@ export class MemoryWorkflowStorage implements WorkflowStorage {
     this.#instances.clear();
     this.#events.clear();
     this.#history.clear();
+    this.#sideEffects.clear();
     this.#idempotencyRecords.clear();
 
     for (const [key, instance] of snapshot.instances) {
@@ -103,6 +119,10 @@ export class MemoryWorkflowStorage implements WorkflowStorage {
 
     for (const [key, history] of snapshot.history) {
       this.#history.set(key, history);
+    }
+
+    for (const [key, effects] of snapshot.sideEffects) {
+      this.#sideEffects.set(key, effects);
     }
 
     for (const [key, record] of snapshot.idempotencyRecords) {
@@ -134,19 +154,23 @@ function cloneInstance(instance: WorkflowInstance): WorkflowInstance {
     ...instance,
     activeStepIds: [...instance.activeStepIds],
     stepStates: cloneStepStates(instance.stepStates),
-    history: instance.history.map(cloneHistoryEntry)
+    history: instance.history.map(cloneHistoryEntry),
+    context: cloneRecord(instance.context),
+    artifactIds: [...instance.artifactIds],
+    metadata: cloneRecord(instance.metadata)
   };
 }
 
 function cloneStoredEvent(event: StoredWorkflowEvent): StoredWorkflowEvent {
   return {
     ...event,
-    event: { ...event.event }
+    event: cloneRecord(event.event) as StoredWorkflowEvent["event"],
+    ...(event.sideEffects ? { sideEffects: event.sideEffects.map(cloneSideEffect) } : {})
   };
 }
 
 function cloneHistoryEntry(entry: WorkflowHistoryEntry): WorkflowHistoryEntry {
-  return { ...entry };
+  return cloneRecord(entry) as WorkflowHistoryEntry;
 }
 
 function cloneStepStates(
@@ -165,7 +189,7 @@ function cloneStepStates(
 
 function cloneIdempotencyRecord(record: StoredIdempotencyRecord): StoredIdempotencyRecord {
   return {
-    event: { ...record.event },
+    event: cloneRecord(record.event) as StoredIdempotencyRecord["event"],
     result: cloneSendResult(record.result)
   };
 }
@@ -177,13 +201,23 @@ function cloneSendResult(result: SendWorkflowEventResult): SendWorkflowEventResu
     historyEntry: { ...result.historyEntry },
     changedStepIds: [...result.changedStepIds],
     availableActions: [...result.availableActions],
+    sideEffects: result.sideEffects.map(cloneSideEffect),
     warnings: [...result.warnings]
   };
+}
+
+function cloneSideEffect(effect: WorkflowSideEffect): WorkflowSideEffect {
+  return cloneRecord(effect) as WorkflowSideEffect;
+}
+
+function cloneRecord<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 interface MemoryWorkflowStorageSnapshot {
   readonly instances: Map<string, WorkflowInstance>;
   readonly events: Map<string, StoredWorkflowEvent[]>;
   readonly history: Map<string, WorkflowHistoryEntry[]>;
+  readonly sideEffects: Map<string, WorkflowSideEffect[]>;
   readonly idempotencyRecords: Map<string, StoredIdempotencyRecord>;
 }

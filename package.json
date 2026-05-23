@@ -1,27 +1,35 @@
 {
-  "name": "flowforge",
-  "version": "0.1.0",
+  "name": "guidegraph",
+  "version": "0.1.0-alpha.0",
   "description": "Developer toolkit for building workflows.",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "tsc -b",
-    "build:examples": "pnpm --filter @flowforge/permit-app build",
-    "dev:permit": "pnpm --filter @flowforge/permit-app dev",
+    "build:examples": "pnpm --filter @guidegraph/permit-app --filter @guidegraph/builder-app build",
+    "build:stories": "pnpm --filter @guidegraph/react-builder stories:build",
+    "dev:builder": "pnpm --filter @guidegraph/builder-app dev",
+    "dev:permit": "pnpm --filter @guidegraph/permit-app dev",
+    "stories:builder": "pnpm --filter @guidegraph/react-builder stories",
     "typecheck": "tsc -b --pretty false",
-    "test": "vitest run",
+    "test": "vitest run --exclude packages/storage-postgres/tests/postgresWorkflowStorage.real.test.ts",
+    "test:builder": "vitest run packages/builder/tests packages/react-builder/tests",
     "test:core": "vitest run packages/core/tests",
     "test:graph": "vitest run packages/graph/tests packages/react-graph/tests",
     "test:http": "vitest run packages/http/tests",
+    "test:mcp": "vitest run packages/mcp/tests",
     "test:server": "vitest run packages/server/tests",
-    "test:postgres": "vitest run packages/storage-postgres/tests",
-    "test:postgres:real": "FLOWFORGE_REAL_POSTGRES=1 vitest run packages/storage-postgres/tests/postgresWorkflowStorage.real.test.ts",
+    "test:postgres": "vitest run packages/storage-postgres/tests/postgresWorkflowStorage.test.ts",
+    "test:postgres:real": "vitest run packages/storage-postgres/tests/postgresWorkflowStorage.real.test.ts",
     "clean": "tsc -b --clean"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^22.13.1",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.2.3",
+    "jsdom": "^29.1.1",
     "pg": "^8.20.0",
     "pg-mem": "^3.0.14",
     "typescript": "^5.7.3",
@@ -35,5 +43,14 @@
   "dependencies": {
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
-  }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/loudsun1997/GuideGraph.git"
+  },
+  "bugs": {
+    "url": "https://github.com/loudsun1997/GuideGraph/issues"
+  },
+  "homepage": "https://github.com/loudsun1997/GuideGraph#readme"
 }

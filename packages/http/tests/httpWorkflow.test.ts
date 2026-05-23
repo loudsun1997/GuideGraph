@@ -1,15 +1,15 @@
-import type { WorkflowEvent, WorkflowInstance } from "@flowforge/core";
-import { createWorkflowServer } from "@flowforge/server";
-import { MemoryWorkflowStorage } from "@flowforge/storage-memory";
+import type { WorkflowEvent, WorkflowInstance } from "@guidegraph/core";
+import { createWorkflowServer } from "@guidegraph/server";
+import { MemoryWorkflowStorage } from "@guidegraph/storage-memory";
 import { describe, expect, it } from "vitest";
 import {
-  createFlowForgeHttpHandler,
+  createGuideGraphHttpHandler,
   createHttpWorkflowClient,
-  type FlowForgeHttpHandler
+  type GuideGraphHttpHandler
 } from "../src/index.ts";
 import { permitWorkflow } from "./fixtures/permitWorkflow.ts";
 
-describe("@flowforge/http", () => {
+describe("@guidegraph/http", () => {
   it("creates an instance over HTTP", async () => {
     const { client } = createTestClient();
 
@@ -270,7 +270,7 @@ describe("@flowforge/http", () => {
     const { handler } = createTestClient();
 
     const response = await handler(
-      new Request("http://localhost/api/flowforge/nope", {
+      new Request("http://localhost/api/guidegraph/nope", {
         method: "GET"
       })
     );
@@ -284,7 +284,7 @@ describe("@flowforge/http", () => {
     const { handler } = createTestClient();
 
     const response = await handler(
-      new Request("http://localhost/api/flowforge/instances", {
+      new Request("http://localhost/api/guidegraph/instances", {
         method: "GET"
       })
     );
@@ -361,14 +361,14 @@ function createTestClient(options: Partial<TestClientOptions> = {}) {
   const workflowServer = createWorkflowServer({
     storage: new MemoryWorkflowStorage()
   });
-  const handler = createFlowForgeHttpHandler({
+  const handler = createGuideGraphHttpHandler({
     workflowServer,
     definitions: [permitWorkflow],
-    basePath: "/api/flowforge",
+    basePath: "/api/guidegraph",
     getActorId: options.getActorId
   });
   const client = createHttpWorkflowClient({
-    baseUrl: "http://localhost/api/flowforge",
+    baseUrl: "http://localhost/api/guidegraph",
     fetch: createHandlerFetch(handler),
     ...(options.getHeaders ? { getHeaders: options.getHeaders } : {})
   });
@@ -376,7 +376,7 @@ function createTestClient(options: Partial<TestClientOptions> = {}) {
   return { client, handler };
 }
 
-function createHandlerFetch(handler: FlowForgeHttpHandler): typeof fetch {
+function createHandlerFetch(handler: GuideGraphHttpHandler): typeof fetch {
   return async (input, init) => {
     const request =
       input instanceof Request

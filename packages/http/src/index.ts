@@ -4,16 +4,16 @@ import type {
   WorkflowEvent,
   WorkflowHistoryEntry,
   WorkflowInstance
-} from "@flowforge/core";
+} from "@guidegraph/core";
 import {
   WorkflowServerError,
   type CreateWorkflowInstanceResult,
   type SendWorkflowEventResult,
   type WorkflowServer,
   type WorkflowServerErrorCode
-} from "@flowforge/server";
+} from "@guidegraph/server";
 
-export type FlowForgeHttpErrorCode =
+export type GuideGraphHttpErrorCode =
   | WorkflowServerErrorCode
   | "UNKNOWN_WORKFLOW_DEFINITION"
   | "DEFINITION_VERSION_MISMATCH"
@@ -24,27 +24,27 @@ export type FlowForgeHttpErrorCode =
   | "STORAGE_COMMIT_FAILED"
   | "INTERNAL_ERROR";
 
-export interface FlowForgeHttpErrorBody {
+export interface GuideGraphHttpErrorBody {
   readonly error: {
-    readonly code: FlowForgeHttpErrorCode;
+    readonly code: GuideGraphHttpErrorCode;
     readonly message: string;
     readonly details?: Record<string, unknown>;
   };
 }
 
-export class FlowForgeHttpError extends Error {
-  readonly code: FlowForgeHttpErrorCode;
+export class GuideGraphHttpError extends Error {
+  readonly code: GuideGraphHttpErrorCode;
   readonly status: number;
   readonly details?: Record<string, unknown>;
 
   constructor(input: {
-    readonly code: FlowForgeHttpErrorCode;
+    readonly code: GuideGraphHttpErrorCode;
     readonly message: string;
     readonly status: number;
     readonly details?: Record<string, unknown>;
   }) {
     super(input.message);
-    this.name = "FlowForgeHttpError";
+    this.name = "GuideGraphHttpError";
     this.code = input.code;
     this.status = input.status;
     if (input.details) {
@@ -93,7 +93,7 @@ export interface HttpWorkflowClient {
   resetInstance?(input: ResetWorkflowInstanceInput): Promise<CreateWorkflowInstanceResult>;
 }
 
-export interface CreateFlowForgeHttpHandlerOptions {
+export interface CreateGuideGraphHttpHandlerOptions {
   readonly workflowServer: WorkflowServer;
   readonly definitions?: readonly WorkflowDefinition[];
   readonly resolveDefinition?: (input: ResolveWorkflowDefinitionInput) => WorkflowDefinition | Promise<WorkflowDefinition>;
@@ -107,7 +107,7 @@ export interface ResolveWorkflowDefinitionInput {
   readonly request: Request;
 }
 
-export interface FlowForgeHttpHandler {
+export interface GuideGraphHttpHandler {
   handle(request: Request): Promise<Response>;
   (request: Request): Promise<Response>;
 }
@@ -202,7 +202,7 @@ export function createHttpWorkflowClient(options: CreateHttpWorkflowClientOption
   };
 }
 
-export function createFlowForgeHttpHandler(options: CreateFlowForgeHttpHandlerOptions): FlowForgeHttpHandler {
+export function createGuideGraphHttpHandler(options: CreateGuideGraphHttpHandlerOptions): GuideGraphHttpHandler {
   const definitionByKey = new Map(
     (options.definitions ?? []).map((definition) => [getDefinitionKey(definition.id, definition.version), definition])
   );
@@ -213,9 +213,9 @@ export function createFlowForgeHttpHandler(options: CreateFlowForgeHttpHandlerOp
 
       if (route.kind === "not_found") {
         return errorResponse(
-          new FlowForgeHttpError({
+          new GuideGraphHttpError({
             code: "NOT_FOUND",
-            message: `Unknown FlowForge route: ${route.path}`,
+            message: `Unknown GuideGraph route: ${route.path}`,
             status: 404
           })
         );
@@ -223,7 +223,7 @@ export function createFlowForgeHttpHandler(options: CreateFlowForgeHttpHandlerOp
 
       if (!route.methodAllowed) {
         return errorResponse(
-          new FlowForgeHttpError({
+          new GuideGraphHttpError({
             code: "METHOD_NOT_ALLOWED",
             message: `Unsupported method ${request.method} for ${route.path}.`,
             status: 405
@@ -316,9 +316,9 @@ export function createFlowForgeHttpHandler(options: CreateFlowForgeHttpHandlerOp
       }
 
       return errorResponse(
-        new FlowForgeHttpError({
+        new GuideGraphHttpError({
           code: "NOT_FOUND",
-          message: "Unknown FlowForge route.",
+          message: "Unknown GuideGraph route.",
           status: 404
         })
       );
@@ -350,12 +350,12 @@ async function requestJson<T>(
   const body = await parseJsonResponse(response);
 
   if (!response.ok) {
-    const errorBody = body as Partial<FlowForgeHttpErrorBody>;
+    const errorBody = body as Partial<GuideGraphHttpErrorBody>;
     const error = errorBody.error;
 
-    throw new FlowForgeHttpError({
+    throw new GuideGraphHttpError({
       code: error?.code ?? "INTERNAL_ERROR",
-      message: error?.message ?? `FlowForge HTTP request failed with status ${response.status}.`,
+      message: error?.message ?? `GuideGraph HTTP request failed with status ${response.status}.`,
       status: response.status,
       ...(error?.details ? { details: error.details } : {})
     });
@@ -383,7 +383,7 @@ async function parseJsonResponse(response: Response): Promise<unknown> {
       };
     }
 
-    throw new Error("FlowForge HTTP response was not valid JSON.");
+    throw new Error("GuideGraph HTTP response was not valid JSON.");
   }
 }
 
@@ -492,11 +492,11 @@ async function readJson<T>(request: Request): Promise<T> {
     const body = await request.json();
     return requireRecord(body, "body") as T;
   } catch (error) {
-    if (error instanceof FlowForgeHttpError) {
+    if (error instanceof GuideGraphHttpError) {
       throw error;
     }
 
-    throw new FlowForgeHttpError({
+    throw new GuideGraphHttpError({
       code: "INVALID_REQUEST",
       message: "Request body must be valid JSON.",
       status: 400
@@ -505,7 +505,7 @@ async function readJson<T>(request: Request): Promise<T> {
 }
 
 async function resolveDefinition(
-  options: CreateFlowForgeHttpHandlerOptions,
+  options: CreateGuideGraphHttpHandlerOptions,
   definitionByKey: ReadonlyMap<string, WorkflowDefinition>,
   request: Request,
   input: Partial<DefinitionReference>
@@ -518,7 +518,7 @@ async function resolveDefinition(
   }
 
   if (!workflowVersion) {
-    throw new FlowForgeHttpError({
+    throw new GuideGraphHttpError({
       code: "INVALID_REQUEST",
       message: "workflowVersion is required.",
       status: 400
@@ -530,7 +530,7 @@ async function resolveDefinition(
   if (!definition) {
     const hasWorkflow = [...definitionByKey.values()].some((candidate) => candidate.id === workflowId);
 
-    throw new FlowForgeHttpError({
+    throw new GuideGraphHttpError({
       code: hasWorkflow ? "DEFINITION_VERSION_MISMATCH" : "UNKNOWN_WORKFLOW_DEFINITION",
       message: hasWorkflow
         ? `Unknown workflow definition version: ${workflowId}@${workflowVersion}.`
@@ -557,7 +557,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 function errorResponse(cause: unknown): Response {
   const error = normalizeHttpError(cause);
-  const body: FlowForgeHttpErrorBody = {
+  const body: GuideGraphHttpErrorBody = {
     error: {
       code: error.code,
       message: error.message,
@@ -568,22 +568,22 @@ function errorResponse(cause: unknown): Response {
   return jsonResponse(body, error.status);
 }
 
-function normalizeHttpError(cause: unknown): FlowForgeHttpError {
-  if (cause instanceof FlowForgeHttpError) {
+function normalizeHttpError(cause: unknown): GuideGraphHttpError {
+  if (cause instanceof GuideGraphHttpError) {
     return cause;
   }
 
   if (cause instanceof WorkflowServerError) {
-    return new FlowForgeHttpError({
+    return new GuideGraphHttpError({
       code: cause.code,
       message: cause.message,
       status: getWorkflowServerErrorStatus(cause.code)
     });
   }
 
-  return new FlowForgeHttpError({
+  return new GuideGraphHttpError({
     code: "INTERNAL_ERROR",
-    message: "FlowForge HTTP handler failed.",
+    message: "GuideGraph HTTP handler failed.",
     status: 500
   });
 }
@@ -597,6 +597,10 @@ function getWorkflowServerErrorStatus(code: WorkflowServerErrorCode): number {
     return 409;
   }
 
+  if (code === "GUARD_REJECTED") {
+    return 403;
+  }
+
   if (code === "INVALID_EVENT") {
     return 400;
   }
@@ -606,7 +610,7 @@ function getWorkflowServerErrorStatus(code: WorkflowServerErrorCode): number {
 
 function requireRecord(value: unknown, fieldName: string): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new FlowForgeHttpError({
+    throw new GuideGraphHttpError({
       code: "INVALID_REQUEST",
       message: `${fieldName} must be an object.`,
       status: 400
@@ -618,7 +622,7 @@ function requireRecord(value: unknown, fieldName: string): Record<string, unknow
 
 function requireString(value: unknown, fieldName: string): string {
   if (typeof value !== "string" || value.trim().length === 0) {
-    throw new FlowForgeHttpError({
+    throw new GuideGraphHttpError({
       code: "INVALID_REQUEST",
       message: `${fieldName} is required.`,
       status: 400
